@@ -5,7 +5,17 @@
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Android%207.0%2B-3ddc84.svg)](#安装)
 [![Version](https://img.shields.io/badge/version-1.0-orange.svg)](docs/CHANGELOG.md)
+[![Next](https://img.shields.io/badge/next-v1.1%20%C2%B7%202026--11--01-blueviolet.svg)](docs/ROADMAP.md)
 [![Package](https://img.shields.io/badge/package-com.deepseek.petoverlay-6f42c1.svg)](#安装)
+
+---
+
+> ## 🚧 v1.1 预告
+>
+> **预计 2026-11-01 发布** · 新增若干宠物动画
+>
+> 进展与变更记录见 **[docs/ROADMAP.md](docs/ROADMAP.md)**，
+> 发布后可在 [Releases](https://github.com/h121003/lanjing-overlay/releases) 下载。
 
 ---
 
@@ -18,6 +28,7 @@
 - [权限](#权限)
 - [已知问题](#已知问题)
 - [版本记录](#版本记录)
+- [路线图](docs/ROADMAP.md)
 - [素材来源](#素材来源)
 - [致谢](#致谢)
 - [许可证](#许可证)
