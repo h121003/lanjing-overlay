@@ -25,7 +25,10 @@ app/
 ## 动画素材
 
 `app/assets/webm/` 下的 106 个 `.webm` 共 52 MB，**未进 Git 仓库**（见 `.gitignore`）。
-构建前把它们放进 `app/assets/webm/` 即可；素材为 VP9-alpha 透明动画，`assets/index.html` 按顺序加载。
+
+素材来自上游存放点 [Jcnet-9527/dsh-Jpet-phone-assets](https://github.com/Jcnet-9527/dsh-Jpet-phone-assets)，
+其 README 明确注明「个人非商业用途，请勿二次分发或商用」——因此本仓库不分发素材，
+构建前请自行把素材放进 `app/assets/webm/`。素材为 VP9-alpha 透明动画，`assets/index.html` 按顺序加载。
 
 ## 签名
 

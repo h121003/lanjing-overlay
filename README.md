@@ -18,6 +18,7 @@
 - [权限](#权限)
 - [已知问题](#已知问题)
 - [版本记录](#版本记录)
+- [素材来源](#素材来源)
 - [致谢](#致谢)
 - [许可证](#许可证)
 - [免责声明](#免责声明)
@@ -87,7 +88,7 @@ docs/
 
 环境与步骤见 **[docs/BUILD.md](docs/BUILD.md)**。要点：
 
-1. 把 106 个 `.webm` 放进 `app/assets/webm/`（52 MB，未进仓库）
+1. 准备动画素材放进 `app/assets/webm/`（本仓库不含素材，见下方 [素材来源](#素材来源)）
 2. 用 Android Studio 打开 `app/`，或 Gradle 直接构建
 3. 用你自己的 keystore 签名
 
@@ -122,9 +123,22 @@ assets/assets/webm/anim1.webm   ← 多余的副本
 
 完整记录见 **[docs/CHANGELOG.md](docs/CHANGELOG.md)**。
 
+## 素材来源
+
+本仓库**不包含**动画素材（`app/assets/webm/` 已被 `.gitignore` 排除）。
+
+动画的上游存放点：[Jcnet-9527/dsh-Jpet-phone-assets](https://github.com/Jcnet-9527/dsh-Jpet-phone-assets)
+——「角色动画为个人非商业用途素材，这里仅作自用存档与远程分发，**请勿二次分发或商用**」。
+
+因此：
+
+- 自行构建时，请把素材放进 `app/assets/webm/`，或按上游说明从 `clips/<clip id>.zip` 取用
+- **不要**把素材二次分发到其他仓库、网盘或应用商店
+
 ## 致谢
 
-- 上游项目：[PC2005-cloud/dsh-pet](https://github.com/PC2005-cloud/dsh-pet) —— 桌面宠物插件的原作者，宠物形态与动画素材源自这里，按其 MIT 许可证使用。
+- 上游项目：[PC2005-cloud/dsh-pet](https://github.com/PC2005-cloud/dsh-pet) —— 桌面宠物插件的原作者，宠物形态与交互思路源自这里，按其 MIT 许可证使用。
+- 动画素材：[Jcnet-9527/dsh-Jpet-phone-assets](https://github.com/Jcnet-9527/dsh-Jpet-phone-assets) —— 仅作个人非商业自用，不随本仓库分发。
 - 本项目维护：[h121003](https://github.com/h121003)
 
 ## 许可证
