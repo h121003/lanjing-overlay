@@ -1,6 +1,14 @@
+# 构建产物
+build/
+*.iml
+.gradle/
+local.properties
 *.keystore
 *.jks
-.idea/
-build/
+
+# 动画素材（52 MB，106 个 webm）不进仓库：按需放进 app/assets/webm/ 再构建
+app/assets/webm/
+
+# 系统
 .DS_Store
-local.properties
+Thumbs.db

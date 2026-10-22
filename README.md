@@ -2,8 +2,8 @@
 
 桌面悬浮宠物：一块常驻的 WebView 悬浮窗，循环播放 WebM 动画，可拖动、可缩放。
 
-> 本仓库目前**只留存 v1.0 的历史构建（legacy）安装包**。
-> 当前开发版还在作者手机上测试，确认没有 bug 后再开源源码。
+> 本仓库包含 **v1.0 历史构建（legacy）安装包** 与 **Android 源码**，源码按 MIT 许可证开源。
+> 动画素材（52 MB / 106 个 webm）不随仓库发布，构建前需自行放入 `app/assets/webm/`，见 [docs/BUILD.md](docs/BUILD.md)。
 
 ## 安装
 
@@ -17,6 +17,23 @@
 | SHA-256 | `55fb33388ad7bf8d38cc5f6a1294da6a0c5f0720fea803ee22fa10f84b5d7967` |
 
 装好后需要在系统里授予「**显示在其他应用上层**」权限，否则悬浮窗不会出现。
+
+## 源码
+
+```
+app/
+├── AndroidManifest.xml
+├── src/com/deepseek/petoverlay/
+│   ├── MainActivity.java     入口：申请悬浮窗权限、启动/停止服务
+│   └── OverlayService.java   前台服务：常驻 WebView 悬浮窗，可拖动、可缩放
+├── res/drawable/ic_launcher.png
+└── assets/index.html         渲染层：循环播放 webm 动画
+docs/BUILD.md                 构建说明（环境、素材、签名）
+```
+
+技术要点：`OverlayService` 用 `WindowManager` 添加 `TYPE_APPLICATION_OVERLAY`（Android 8.0+，
+低版本回退 `TYPE_PHONE`）窗口，内部放一个 `WebView` 加载 `assets/index.html`，
+动画由前端按序播放 `webm` 透明视频；窗口支持拖动与双指缩放，服务为前台服务保活。
 
 ## 这一版已知的问题
 
@@ -49,7 +66,7 @@ assets/assets/webm/anim1.webm   ← 多余的副本
 
 ## 许可
 
-待定 —— 作者尚未选定许可证。
+[MIT](LICENSE) © 2026 h121003 —— 可自由使用、修改、分发与商用，保留版权与许可声明即可。
 
 ## 免责声明
 

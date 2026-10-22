@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<style>
+  html, body {
+    margin: 0; padding: 0; width: 100%; height: 100%;
+    background: transparent; overflow: hidden;
+    -webkit-user-select: none; user-select: none;
+  }
+  #c {
+    width: 100%; height: 100%; display: block;
+    background: transparent;
+    pointer-events: none;
+  }
+  #v {
+    position: absolute; left: -9999px; top: -9999px;
+    width: 2px; height: 2px; opacity: 0;
+    pointer-events: none;
+  }
+  #bubble {
+    position: absolute;
+    left: 50%;
+    top: 4px;
+    transform: translateX(-50%);
+    width: max-content;
+    max-width: 88%;
+    max-height: 36%;
+    overflow: hidden;
+    padding: 10px 16px;
+    background: rgba(255, 255, 255, 0.96);
+    color: #2b3a55;
+    font-family: -apple-system, "PingFang SC", "Noto Sans CJK SC", sans-serif;
+    font-size: 21px;
+    line-height: 1.35;
+    text-align: center;
+    border-radius: 18px;
+    box-shadow: 0 4px 16px rgba(40, 70, 120, 0.22);
+    border: 2px solid rgba(120, 170, 255, 0.55);
+    white-space: normal;
+    word-break: break-word;
+    display: none;
+    pointer-events: none;
+    box-sizing: border-box;
+  }
+  #bubble.show {
+    display: block;
+  }
+  #bubble::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    bottom: -9px;
+    margin-left: -8px;
+    border-left: 8px solid transparent;
+    border-right: 8px solid transparent;
+    border-top: 9px solid rgba(255, 255, 255, 0.96);
+  }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="bubble"></div>
+<video id="v" muted playsinline webkit-playsinline preload="auto"></video>
+<script>
+  var LIST = [
+    "anim1.webm", "anim2.webm", "anim3.webm", "anim4.webm", "anim5.webm",
+    "anim6.webm", "anim7.webm", "anim8.webm", "anim9.webm", "anim10.webm",
+    "anim11.webm", "anim12.webm", "anim13.webm", "anim14.webm", "anim15.webm",
+    "anim16.webm", "anim17.webm", "anim18.webm", "anim19.webm", "anim20.webm",
+    "anim21.webm", "anim22.webm", "anim23.webm", "anim24.webm", "anim25.webm",
+    "anim26.webm", "anim27.webm", "anim28.webm", "anim29.webm", "anim30.webm",
+    "anim31.webm", "anim32.webm", "anim33.webm", "anim34.webm", "anim35.webm",
+    "anim36.webm", "anim37.webm", "anim38.webm", "anim39.webm", "anim40.webm",
+    "anim41.webm", "anim42.webm", "anim43.webm", "anim44.webm", "anim45.webm",
+    "anim46.webm", "anim47.webm", "anim48.webm", "anim49.webm", "anim50.webm",
+    "anim51.webm", "anim52.webm", "anim53.webm", "anim54.webm", "anim55.webm",
+    "anim56.webm", "anim57.webm", "anim58.webm", "anim59.webm", "anim60.webm",
+    "anim61.webm", "anim62.webm", "anim63.webm", "anim64.webm", "anim65.webm",
+    "anim66.webm", "anim67.webm", "anim68.webm", "anim69.webm", "anim70.webm",
+    "anim71.webm", "anim72.webm", "anim73.webm", "anim74.webm", "anim75.webm",
+    "anim76.webm", "anim77.webm", "anim78.webm", "anim79.webm", "anim80.webm",
+    "anim81.webm", "anim82.webm", "anim83.webm", "anim84.webm", "anim85.webm",
+    "anim86.webm", "anim87.webm", "anim88.webm", "anim89.webm", "anim90.webm",
+    "anim91.webm", "anim92.webm", "anim93.webm", "anim94.webm", "anim95.webm",
+    "anim96.webm", "anim97.webm", "anim98.webm", "anim99.webm", "anim100.webm",
+    "anim101.webm", "anim102.webm", "anim103.webm", "anim104.webm", "anim105.webm",
+    "anim106.webm",
+  ];
+
+  // ===== 蓝鱼人设：Q版蓝发小鲸鱼女仆，吃白饭、爱零食、爱玩魔方、爱躺平、会碎碎念，温柔乖巧带点俏皮 =====
+  var ONE_LINES = [
+    "三球抛接，看好了！", "来一局五子棋？", "东张西望，找点事做", "中秋的月亮真圆，月饼真甜",
+    "女仆舞，优雅吧？", "分文不剩，太难了", "数着钱，怎么越数越少", "钱袋空空，心里也空",
+    "金袋叮当，我有钱啦", "钱袋还好，勉强够用", "钱袋满溢，发财了！", "被抓到了……我没偷吃",
+    "写代码使我快乐（假的）", "写个福字，福气满满", "凭空生花，厉害吧", "小动物们，都围过来了",
+    "这个魔方我拼到一半了", "好困，让我睡会儿", "我跑起来可快了", "敲敲桌子，陪我玩",
+    "漂浮踏步，轻飘飘的", "跳一下，抓碎了！", "小汽车，嘟嘟嘟", "压力好大，蹲一蹲",
+    "变鸽子，飞走了", "宅舞，看我的", "吃 Token，好香", "冰淇淋化了，好可惜",
+    "午餐时间，开饭", "大闸蟹，剥给你吃", "年糕黏黏的，好吃", "早餐吃饱，一天有劲",
+    "晚饭吃什么好呢", "汤圆圆圆的，像我", "白饭也香，你不懂", "粽子，甜的咸的都要",
+    "糖葫芦，酸酸甜甜", "腊八粥，暖暖的", "吃西瓜，吐籽", "重阳糕，步步高",
+    "长寿面，长长久久", "青团，糯糯的", "饺子，一口一个", "吹气球，呼呼呼",
+    "吹笛子，给你听", "哈欠……困了", "堆雪人，好冷", "大口吃零食，最爽",
+    "主人，我回来了", "转一圈，好看吗", "拉小提琴，好听吗", "踱步张望，等你回来",
+    "唉，工作好累", "忙忙忙，点个不停", "思考中，别打扰", "清点归档，井井有条",
+    "搞定！庆祝一下", "待机，慢慢呼吸", "哼首歌，悠闲自在", "扑克魔术，看清楚",
+    "刚睡着就被吵醒", "抽陀螺，转起来", "拆礼物，是什么？", "插茱萸，赏菊花",
+    "摇扇子，凉快", "撸猫，好舒服", "红包收到，谢谢主人", "孔明灯，许个愿",
+    "放河灯，顺水流", "放烟花，好漂亮", "放风筝，飞高高", "换身衣服，好看吗",
+    "是啊，吃什么好", "刷牙，早睡早起", "涮火锅，热气腾腾", "深度思考，碎碎念",
+    "哼，不理你了", "嗨，你好呀", "哎呀，被看到了", "开心，跳起来",
+    "咯咯，痒", "照镜子，还是很可爱", "水枪，发射！", "又输了，气死了",
+    "尾巴拍地，砰砰", "发呆中，碎碎念", "对着屏幕碎碎念", "擦桌子，碎碎念",
+    "穿针乞巧，手要稳", "舞狮头，过年啦", "荡秋千，荡高高", "小幽灵，萌化你",
+    "蓝鲸现世，威武", "花开头顶，蝴蝶来", "螃蟹走路，横着走", "吓我一跳！",
+    "被落叶埋了", "被拖起来了，放我下来", "圣诞树，挂满彩灯", "南瓜灯，讨糖去",
+    "伸个懒腰，舒坦", "踢毽子，看我", "摇摆舞，轻快的", "记录一下，轻快的",
+    "骑木马，驾！", "吐泡泡，咕噜咕噜",
+  ];
+
+  // ===== 之后接 API 用：填上地址就会优先走接口，失败自动回退本地文案 =====
+  var API_URL = "";
+
+  var idx = 0;
+  var v = document.getElementById('v');
+  var c = document.getElementById('c');
+  var ctx = c.getContext('2d');
+  var bubble = document.getElementById('bubble');
+  var bubbleTimer = null;
+  var currentLine = '';
+  var lineUntil = 0;
+
+  function pickLine(i) {
+    return ONE_LINES[i % ONE_LINES.length];
+  }
+
+  function say(text) {
+    if (!text) return;
+    currentLine = text;
+    lineUntil = Date.now() + 3400;
+  }
+
+  function speakRandomAt(i) {
+    if (API_URL && window.fetch) {
+      fetch(API_URL, { cache: 'no-store' })
+        .then(function (r) { return r.json(); })
+        .then(function (j) {
+          var t = (j && (j.text || j.line || j.content)) || '';
+          say(t || pickLine(i));
+        })
+        .catch(function () { say(pickLine(i)); });
+    } else {
+      say(pickLine(i));
+    }
+  }
+
+  function fit() {
+    var dpr = Math.min(window.devicePixelRatio || 1, 2);
+    var w = Math.floor((c.clientWidth || 460) * dpr);
+    var h = Math.floor((c.clientHeight || 460) * dpr);
+    if (c.width !== w || c.height !== h) {
+      c.width = w;
+      c.height = h;
+    }
+  }
+
+  function play(i) {
+    v.src = 'webm/' + LIST[i];
+    var p = v.play();
+    if (p && p.catch) p.catch(function () {});
+  }
+
+  function drawBubble(text) {
+    ctx.save();
+    var fs = Math.round(c.width / 22);
+    ctx.font = 'bold ' + fs + 'px sans-serif';
+    var tw = ctx.measureText(text).width;
+    var padX = Math.round(fs * 0.7), padY = Math.round(fs * 0.45);
+    var bh = fs + padY * 2 + 4;
+    var bw = Math.min(c.width - fs * 0.6, tw + padX * 2);
+    var bx = (c.width - bw) / 2;
+    var by = Math.round(fs * 0.5);
+    var r = Math.round(fs * 0.55);
+    ctx.beginPath();
+    ctx.moveTo(bx + r, by);
+    ctx.lineTo(bx + bw - r, by);
+    ctx.quadraticCurveTo(bx + bw, by, bx + bw, by + r);
+    ctx.lineTo(bx + bw, by + bh - r);
+    ctx.quadraticCurveTo(bx + bw, by + bh, bx + bw - r, by + bh);
+    ctx.lineTo(bx + r, by + bh);
+    ctx.quadraticCurveTo(bx, by + bh, bx, by + bh - r);
+    ctx.lineTo(bx, by + r);
+    ctx.quadraticCurveTo(bx, by, bx + r, by);
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(255,255,255,0.96)';
+    ctx.fill();
+    ctx.lineWidth = Math.max(2, Math.round(fs * 0.08));
+    ctx.strokeStyle = 'rgba(120,170,255,0.85)';
+    ctx.stroke();
+    ctx.fillStyle = '#2b3a55';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(text, c.width / 2, by + bh / 2 + 1);
+    ctx.restore();
+  }
+
+  function draw() {
+    if (v.readyState >= 2 && v.videoWidth > 0) {
+      fit();
+      ctx.clearRect(0, 0, c.width, c.height);
+      var vw = v.videoWidth, vh = v.videoHeight;
+      var scale = Math.min(c.width / vw, c.height / vh);
+      var w = vw * scale, h = vh * scale;
+      ctx.drawImage(v, (c.width - w) / 2, (c.height - h) / 2, w, h);
+      if (currentLine && Date.now() > lineUntil) currentLine = '';
+      if (currentLine) {
+        var maxW = c.width * 0.9;
+        var fs = 34;
+        ctx.font = 'bold ' + fs + 'px sans-serif';
+        ctx.textAlign = 'center';
+        var tw = ctx.measureText(currentLine).width;
+        while (tw > maxW && fs > 18) {
+          fs -= 2;
+          ctx.font = 'bold ' + fs + 'px sans-serif';
+          tw = ctx.measureText(currentLine).width;
+        }
+        ctx.lineWidth = Math.max(3, Math.round(fs * 0.2));
+        ctx.strokeStyle = 'rgba(43,58,85,0.92)';
+        ctx.fillStyle = '#ffffff';
+        var baseY = fs + 10;
+        if (tw <= maxW) {
+          ctx.strokeText(currentLine, c.width / 2, baseY);
+          ctx.fillText(currentLine, c.width / 2, baseY);
+        } else {
+          var half = Math.ceil(currentLine.length / 2);
+          var l1 = currentLine.slice(0, half);
+          var l2 = currentLine.slice(half);
+          ctx.strokeText(l1, c.width / 2, baseY);
+          ctx.fillText(l1, c.width / 2, baseY);
+          ctx.strokeText(l2, c.width / 2, baseY + fs * 1.35);
+          ctx.fillText(l2, c.width / 2, baseY + fs * 1.35);
+        }
+      }
+    }
+    requestAnimationFrame(draw);
+  }
+
+  v.addEventListener('ended', function () {
+    idx = (idx + 1) % LIST.length;
+    play(idx);
+  });
+
+  window.nextAnim = function () {
+    try {
+      idx = (idx + 1) % LIST.length;
+      play(idx);
+      speakRandomAt(idx);
+      return "ok:" + currentLine + ":pool" + pool.length;
+    } catch (e) {
+      return "err:" + (e && e.message ? e.message : e);
+    }
+  };
+
+  fit();
+  requestAnimationFrame(draw);
+  if (LIST.length) play(0);
+
+  // 启动时打一声招呼
+  setTimeout(function () { say("主人好～我回来啦"); }, 600);
+</script>
+</body>
+</html>
