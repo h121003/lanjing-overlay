@@ -4,7 +4,7 @@ plugins {
 
 android {
     namespace 'com.deepseek.petoverlay'
-    compileSdk 33
+    compileSdk 36
 
     defaultConfig {
         applicationId 'com.deepseek.petoverlay'
@@ -14,7 +14,7 @@ android {
         versionName '1.2'
     }
 
-    // 沿用现有的目录结构：源码在 app/src，清单在 app/AndroidManifest.xml
+    // 沿用现有目录结构：源码在 app/src，清单在 app/AndroidManifest.xml
     sourceSets {
         main {
             manifest.srcFile 'AndroidManifest.xml'
@@ -24,14 +24,8 @@ android {
         }
     }
 
-    buildTypes {
-        release {
-            minifyEnabled false
-        }
-    }
-
     compileOptions {
-        sourceCompatibility JavaVersion.VERSION_11
-        targetCompatibility JavaVersion.VERSION_11
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
     }
 }
