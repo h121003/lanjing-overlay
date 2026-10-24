@@ -10,7 +10,7 @@ android {
         applicationId 'com.deepseek.petoverlay'
         minSdk 26
         targetSdk 33
-        versionCode 3
+        versionCode 4
         versionName '1.2'
     }
 
