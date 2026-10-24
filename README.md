@@ -19,6 +19,17 @@
 
 ---
 
+> ### ⚠️ 版权提示
+>
+> 本项目使用的动画素材，版权归上游作者所有。我们曾尝试与作者联系，但**未能取得授权回复**。
+>
+> 因此，在作者作出任何表态之前，本项目涉及素材的资源（安装包等）**可能随时下架**，恕不另行通知。
+>
+> - 如果你是版权方，希望移除相关内容：请开 Issue，我们会在 24 小时内处理
+> - 自行构建时，建议使用你自己拥有权利的素材
+
+---
+
 ## 目录
 
 - [特性](#特性)
@@ -140,6 +151,11 @@ assets/assets/webm/anim1.webm   ← 多余的副本
 
 动画的上游存放点：[Jcnet-9527/dsh-Jpet-phone-assets](https://github.com/Jcnet-9527/dsh-Jpet-phone-assets)
 ——「角色动画为个人非商业用途素材，这里仅作自用存档与远程分发，**请勿二次分发或商用**」。
+
+**授权状态**：已就该素材的使用联系上游作者，但未能取得授权回复（见
+[assets#1](https://github.com/Jcnet-9527/dsh-Jpet-phone-assets/issues/1) 与
+[dsh-Jpet-phone#2](https://github.com/Jcnet-9527/dsh-Jpet-phone/issues/2)）。
+在获得明确授权前，相关资源可能随时下架。
 
 因此：
 
