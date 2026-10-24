@@ -264,6 +264,9 @@
   };
 
   fit();
+  // 横屏 / 分屏 / 窗口尺寸变化后重新计算画布，避免画面被拉伸
+  window.addEventListener('resize', fit);
+  window.addEventListener('orientationchange', fit);
   requestAnimationFrame(draw);
   if (LIST.length) play(0);
 

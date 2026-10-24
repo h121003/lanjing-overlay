@@ -88,7 +88,7 @@ public class OverlayService extends Service {
         params.x = 200;
         params.y = 700;
 
-        webView = new WebView(this);
+        webView = new WebView(getApplicationContext());
         webView.setBackgroundColor(Color.TRANSPARENT);
         // hardware layer removed: it blocked DOM repaint for the bubble
 
@@ -137,7 +137,13 @@ public class OverlayService extends Service {
             }
         });
 
-        wm.addView(webView, params);
+        try {
+            wm.addView(webView, params);
+        } catch (Throwable t) {
+            // 悬浮窗权限被中途撤销等情况下，优雅退出而不是崩溃
+            Log.w("PET", "addView failed", t);
+            stopSelf();
+        }
     }
 
     @Override
@@ -148,12 +154,21 @@ public class OverlayService extends Service {
     @Override
     public void onDestroy() {
         super.onDestroy();
-        if (webView != null && wm != null) {
+        if (webView != null) {
+            if (wm != null) {
+                try {
+                    wm.removeView(webView);
+                } catch (Exception ignored) {
+                }
+            }
+            // 释放 WebView，避免反复启停后内存持续增长
             try {
-                wm.removeView(webView);
+                webView.destroy();
             } catch (Exception ignored) {
             }
+            webView = null;
         }
+        stopForeground(true);
         instance = null;
     }
 

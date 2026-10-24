@@ -87,6 +87,16 @@
 
 > 仓库内也保留了同一份文件：[`apk/lanjing-overlay-v1.0-legacy.apk`](apk/lanjing-overlay-v1.0-legacy.apk)
 
+**签名**：自签名证书（`CN=Lanjing Overlay, O=h121003`，2048 位 RSA，有效期至 2051-10-24）。
+证书 SHA-256 指纹：
+
+```text
+EC:A5:BB:8B:90:0A:ED:6F:65:30:6B:77:EB:48:27:B0:
+E7:21:FE:6C:63:55:2B:75:AA:C0:AC:5A:45:84:D9:92
+```
+
+v1.0 与 v1.1 使用**不同签名**，跨版本升级需先卸载旧版（应用数据不保留）。
+
 ## 源码
 
 ```text
@@ -120,7 +130,7 @@ docs/
 环境与步骤见 **[docs/BUILD.md](docs/BUILD.md)**。要点：
 
 1. 准备动画素材放进 `app/assets/webm/`（本仓库不含素材，见下方 [素材来源](#素材来源)）
-2. 用 Android Studio 打开 `app/`，或 Gradle 直接构建
+2. 用 Android Studio 打开 `app/`（**注意：仓库暂未附带 `build.gradle`**，需自行新建模块或补齐构建脚本）
 3. 用你自己的 keystore 签名
 
 ## 权限
