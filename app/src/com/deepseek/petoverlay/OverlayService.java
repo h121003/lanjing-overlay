@@ -20,6 +20,9 @@ import android.widget.Toast;
 import android.webkit.WebView;
 
 public class OverlayService extends Service {
+    /** 发布版关闭调试日志，避免把窗口坐标写进 logcat。 */
+    private static final boolean DEBUG = false;
+
     private static OverlayService instance;
 
     private WindowManager wm;
@@ -95,9 +98,14 @@ public class OverlayService extends Service {
         WebSettings s = webView.getSettings();
         s.setJavaScriptEnabled(true);
         s.setMediaPlaybackRequiresUserGesture(false);
-        s.setAllowFileAccess(true);
-        s.setAllowContentAccess(true);
-        s.setDomStorageEnabled(true);
+        s.setAllowFileAccess(true);                 // 必需：加载 android_asset
+        s.setAllowContentAccess(false);
+        s.setAllowFileAccessFromFileURLs(false);
+        s.setAllowUniversalAccessFromFileURLs(false);
+        s.setDomStorageEnabled(false);
+        s.setSaveFormData(false);
+        // 被其他悬浮窗遮挡时不响应触摸，防点击劫持
+        webView.setFilterTouchesWhenObscured(true);
 
         webView.loadUrl("file:///android_asset/index.html");
 
@@ -106,7 +114,7 @@ public class OverlayService extends Service {
             public boolean onTouch(View v, MotionEvent event) {
                 switch (event.getActionMasked()) {
                     case MotionEvent.ACTION_DOWN:
-                        Log.d("PET", "DOWN raw=" + event.getRawX() + "," + event.getRawY());
+                        if (DEBUG) Log.d("PET", "DOWN raw=" + event.getRawX() + "," + event.getRawY());
                         initialX = params.x;
                         initialY = params.y;
                         initialTouchX = event.getRawX();
@@ -122,12 +130,12 @@ public class OverlayService extends Service {
                         long dur = System.currentTimeMillis() - downTime;
                         float dx = Math.abs(event.getRawX() - initialTouchX);
                         float dy = Math.abs(event.getRawY() - initialTouchY);
-                        Log.d("PET", "UP dur=" + dur + " dx=" + dx + " dy=" + dy);
+                        if (DEBUG) Log.d("PET", "UP dur=" + dur + " dx=" + dx + " dy=" + dy);
                         if (dur < 300 && dx < 20 && dy < 20) {
-                            Log.d("PET", "TAP -> nextAnim");
+                            if (DEBUG) Log.d("PET", "TAP -> nextAnim");
                             webView.evaluateJavascript("nextAnim()", new android.webkit.ValueCallback<String>() {
                                 public void onReceiveValue(String value) {
-                                    Log.d("PET", "js=" + value);
+                                    if (DEBUG) Log.d("PET", "js=" + value);
                                 }
                             });
                         }

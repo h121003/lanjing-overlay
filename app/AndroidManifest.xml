@@ -8,6 +8,8 @@
     <application
         android:label="蓝鱼悬浮窗"
         android:icon="@drawable/ic_launcher"
+        android:allowBackup="false"
+        android:usesCleartextTraffic="false"
         android:hardwareAccelerated="true"
         android:theme="@android:style/Theme.DeviceDefault.NoActionBar">
 
