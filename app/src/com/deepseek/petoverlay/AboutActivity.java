@@ -1,6 +1,9 @@
 package com.deepseek.petoverlay;
 
 import android.app.Activity;
+import android.content.ClipData;
+import android.content.ClipboardManager;
+import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageInfo;
 import android.graphics.BitmapFactory;
@@ -14,6 +17,7 @@ import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
+import android.widget.Toast;
 
 /**
  * 关于页：版本信息 + 联系方式 + 支持开发。
@@ -46,8 +50,10 @@ public class AboutActivity extends Activity {
                         + "开源协议：MIT"));
 
         root.addView(section("QQ 交流群",
-                "群号 " + QQ_GROUP + "\n长按群号可复制，或直接扫码加入"));
+                "群号 " + QQ_GROUP + "\n点下方按钮直接跳转 QQ，或扫码加入"));
         root.addView(qrImage(R.drawable.qq_qr));
+        root.addView(actionButton("打开 QQ 群", null, QQ_GROUP));
+        root.addView(actionButton("复制群号", null, QQ_GROUP));
 
         root.addView(section("Telegram",
                 "@SBH121003\n扫码或点击下方按钮打开"));
@@ -111,20 +117,57 @@ public class AboutActivity extends Activity {
         return iv;
     }
 
-    private Button actionButton(String text, final String url) {
+    private Button actionButton(String text, String url) {
+        return actionButton(text, url, null);
+    }
+
+    /** url 为 null 且 group 非 null 时，按「QQ 群」处理：跳转 QQ 或复制群号 */
+    private Button actionButton(String text, final String url, final String group) {
         Button b = new Button(this);
         b.setText(text);
         b.setAllCaps(false);
         b.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
+                if (group != null) {
+                    handleQqGroup(text, group);
+                    return;
+                }
                 try {
                     startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url)));
-                } catch (Exception ignored) {
+                } catch (Exception e) {
+                    Toast.makeText(AboutActivity.this, "没有可打开该链接的应用", Toast.LENGTH_SHORT).show();
                 }
             }
         });
         return b;
+    }
+
+    /** 「打开 QQ 群」走 QQ 的 scheme；「复制群号」直接进剪贴板 */
+    private void handleQqGroup(String buttonText, String group) {
+        if (!buttonText.startsWith("打开")) {
+            copyText(group);
+            Toast.makeText(this, "群号已复制：" + group, Toast.LENGTH_SHORT).show();
+            return;
+        }
+        String scheme = "mqqapi://card/show_pslcard?src_type=internal&version=1&uin="
+                + group + "&card_type=group&source=qrcode";
+        try {
+            Intent i = new Intent(Intent.ACTION_VIEW, Uri.parse(scheme));
+            i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            startActivity(i);
+        } catch (Exception e) {
+            copyText(group);
+            Toast.makeText(this, "未找到 QQ，群号已复制：" + group, Toast.LENGTH_LONG).show();
+        }
+    }
+
+    private void copyText(String text) {
+        try {
+            ClipboardManager cm = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
+            cm.setPrimaryClip(ClipData.newPlainText("QQ", text));
+        } catch (Exception ignored) {
+        }
     }
 
     private LinearLayout.LayoutParams matchWrap() {
