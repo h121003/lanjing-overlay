@@ -81,6 +81,15 @@ public class MainActivity extends Activity {
         });
         ll.addView(big);
 
+        Button about = new Button(this);
+        about.setText("关于 / 联系方式");
+        about.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                startActivity(new Intent(MainActivity.this, AboutActivity.class));
+            }
+        });
+        ll.addView(about);
+
         setContentView(ll);
     }
 }

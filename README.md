@@ -181,6 +181,16 @@ assets/assets/webm/anim1.webm   ← 多余的副本
 - 自行构建时，请把素材放进 `app/assets/webm/`，或按上游说明从 `clips/<clip id>.zip` 取用
 - **不要**把素材二次分发到其他仓库、网盘或应用商店
 
+## 联系方式
+
+| 渠道 | 地址 |
+|---|---|
+| QQ 交流群 | `1129465403` |
+| Telegram | [@SBH121003](https://t.me/sbh121003) |
+| 反馈问题 | [GitHub Issues](https://github.com/h121003/lanjing-overlay/issues) |
+
+> App 内也有同样的入口：「关于 / 联系方式」（v1.2 起可用）。
+
 ## 致谢
 
 - 上游项目：[PC2005-cloud/dsh-pet](https://github.com/PC2005-cloud/dsh-pet) —— 桌面宠物插件的原作者，宠物形态与交互思路源自这里，按其 MIT 许可证使用。
