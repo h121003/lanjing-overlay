@@ -60,6 +60,15 @@
 
 ## 安装
 
+**版本对应关系**（记住这条就不会拿错包）：
+
+| 版本 | 动画数量 | 包大小 | 状态 |
+|---|---|---|---|
+| **v1.1** | **106 段** | 约 54 MB | 待发布（预计 2026-11-01） |
+| **v1.0** | **12 段** | 11.1 MB | ✅ 已发布 |
+
+### v1.0（12 段动画）
+
 | 项 | 值 |
 |---|---|
 | 安装包 | [`lanjing-overlay-v1.0-legacy.apk`](https://github.com/h121003/lanjing-overlay/releases/download/v1.0-legacy/lanjing-overlay-v1.0-legacy.apk) |
