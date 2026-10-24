@@ -166,11 +166,36 @@
     }
   }
 
+  // 预加载器：切到下一段前先把它的数据准备好，减少切换卡顿
+  var pre = document.createElement('video');
+  pre.muted = true;
+  pre.preload = 'auto';
+  pre.style.display = 'none';
+  document.body.appendChild(pre);
+
+  var pendingTap = false;
+
+  function preloadNext(i) {
+    try {
+      pre.src = 'webm/' + LIST[(i + 1) % LIST.length];
+    } catch (e) {}
+  }
+
   function play(i) {
     v.src = 'webm/' + LIST[i];
     var p = v.play();
     if (p && p.catch) p.catch(function () {});
+    preloadNext(i);
   }
+
+  // 页面/视频尚未就绪时的点击先记下，等首帧到了再切，避免「点了没反应」
+  v.addEventListener('loadeddata', function () {
+    if (pendingTap) {
+      pendingTap = false;
+      idx = (idx + 1) % LIST.length;
+      play(idx);
+    }
+  });
 
   function drawBubble(text) {
     ctx.save();
@@ -254,6 +279,7 @@
 
   window.nextAnim = function () {
     try {
+      if (!v.readyState) { pendingTap = true; return 'queued'; }
       idx = (idx + 1) % LIST.length;
       play(idx);
       speakRandomAt(idx);
