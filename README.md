@@ -123,23 +123,6 @@ docs/
 2. 用 Android Studio 打开 `app/`，或 Gradle 直接构建
 3. 用你自己的 keystore 签名
 
-## 安全说明
-
-针对这个 App 做过一轮源码审计，结论是**攻击面很小**，并做了以下加固：
-
-| 项 | 措施 |
-|---|---|
-| 网络 | 不申请 `INTERNET`，WebView 无法加载远程内容 |
-| JS 桥 | 不使用 `addJavascriptInterface`，页面无法调用本地能力 |
-| WebView | 关闭 `allowContentAccess` / `DomStorage` / 表单保存；显式关闭跨源文件访问 |
-| 点击劫持 | `setFilterTouchesWhenObscured(true)`，被其他悬浮窗遮挡时不响应触摸 |
-| 备份 | `allowBackup="false"`，禁止 `adb backup` 导出应用数据 |
-| 组件 | Activity 显式 `exported="true"`（仅启动器），Service 显式 `exported="false"` |
-| 日志 | 发布版关闭调试日志，不把窗口坐标写进 logcat |
-| 崩溃 | `addView` 失败时优雅退出，不闪退 |
-
-`targetSdk` 由 28 提升到 33（Android 13），并补充了 `POST_NOTIFICATIONS` 运行时申请。
-
 ## 权限
 
 | 权限 | 用途 |

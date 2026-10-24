@@ -4,7 +4,7 @@
     android:versionCode="1"
     android:versionName="1.0">
 
-    <uses-sdk android:minSdkVersion="26" android:targetSdkVersion="33" />
+    <uses-sdk android:minSdkVersion="26" android:targetSdkVersion="28" />
 
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
@@ -13,22 +13,16 @@
     <application
         android:label="蓝鱼悬浮窗"
         android:icon="@drawable/ic_launcher"
-        android:allowBackup="false"
-        android:usesCleartextTraffic="false"
         android:hardwareAccelerated="true"
         android:theme="@android:style/Theme.DeviceDefault.NoActionBar">
 
-        <activity
-            android:name=".MainActivity"
-            android:exported="true">
+        <activity android:name=".MainActivity">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
 
-        <service
-            android:name=".OverlayService"
-            android:exported="false" />
+        <service android:name=".OverlayService" />
     </application>
 </manifest>

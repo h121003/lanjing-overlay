@@ -1,14 +1,5 @@
 # 版本记录
 
-## 未发布 — 安全加固（源码）
-
-- Manifest：`allowBackup=false`、`usesCleartextTraffic=false`、Activity 显式 `exported`、Service 显式 `exported="false"`
-- `targetSdk` 28 → 33，补充 `POST_NOTIFICATIONS` 运行时申请
-- WebView：关闭 `allowContentAccess` / `DomStorage` / 表单保存，显式关闭跨源文件访问，开启 `setFilterTouchesWhenObscured`
-- 发布版关闭调试日志（`DEBUG=false`）
-- `addView` 增加异常保护，权限被撤销时不再崩溃
-
-
 ## v1.0（旧构建标为 v1.0-legacy）— 2026-10-21
 
 > 12 段动画版本。v1.1 为 106 段动画版本，见上。

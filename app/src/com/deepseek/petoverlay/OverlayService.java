@@ -20,9 +20,6 @@ import android.widget.Toast;
 import android.webkit.WebView;
 
 public class OverlayService extends Service {
-    /** 发布版关闭日志：避免把窗口坐标与点击时长写进 logcat。 */
-    private static final boolean DEBUG = false;
-
     private static OverlayService instance;
 
     private WindowManager wm;
@@ -96,18 +93,11 @@ public class OverlayService extends Service {
         // hardware layer removed: it blocked DOM repaint for the bubble
 
         WebSettings s = webView.getSettings();
-        // 只加载本地 file:///android_asset，收紧其余能力：
-        // 无 INTERNET 权限、无 addJavascriptInterface，远程内容进不来
         s.setJavaScriptEnabled(true);
         s.setMediaPlaybackRequiresUserGesture(false);
-        s.setAllowFileAccess(true);                    // 必需：加载 android_asset
-        s.setAllowContentAccess(false);
-        s.setAllowFileAccessFromFileURLs(false);
-        s.setAllowUniversalAccessFromFileURLs(false);
-        s.setDomStorageEnabled(false);
-        s.setSaveFormData(false);
-        // 防止被其他悬浮窗盖住时偷走点击（tapjacking）
-        webView.setFilterTouchesWhenObscured(true);
+        s.setAllowFileAccess(true);
+        s.setAllowContentAccess(true);
+        s.setDomStorageEnabled(true);
 
         webView.loadUrl("file:///android_asset/index.html");
 
@@ -116,7 +106,7 @@ public class OverlayService extends Service {
             public boolean onTouch(View v, MotionEvent event) {
                 switch (event.getActionMasked()) {
                     case MotionEvent.ACTION_DOWN:
-                        if (DEBUG) Log.d("PET", "DOWN raw=" + event.getRawX() + "," + event.getRawY());
+                        Log.d("PET", "DOWN raw=" + event.getRawX() + "," + event.getRawY());
                         initialX = params.x;
                         initialY = params.y;
                         initialTouchX = event.getRawX();
@@ -132,12 +122,12 @@ public class OverlayService extends Service {
                         long dur = System.currentTimeMillis() - downTime;
                         float dx = Math.abs(event.getRawX() - initialTouchX);
                         float dy = Math.abs(event.getRawY() - initialTouchY);
-                        if (DEBUG) Log.d("PET", "UP dur=" + dur + " dx=" + dx + " dy=" + dy);
+                        Log.d("PET", "UP dur=" + dur + " dx=" + dx + " dy=" + dy);
                         if (dur < 300 && dx < 20 && dy < 20) {
-                            if (DEBUG) Log.d("PET", "TAP -> nextAnim");
+                            Log.d("PET", "TAP -> nextAnim");
                             webView.evaluateJavascript("nextAnim()", new android.webkit.ValueCallback<String>() {
                                 public void onReceiveValue(String value) {
-                                    if (DEBUG) Log.d("PET", "js=" + value);
+                                    Log.d("PET", "js=" + value);
                                 }
                             });
                         }
@@ -147,13 +137,7 @@ public class OverlayService extends Service {
             }
         });
 
-        try {
-            wm.addView(webView, params);
-        } catch (Throwable t) {
-            // 权限被撤销 / 窗口服务异常时优雅退出，不让服务崩掉
-            Log.w("PET", "addView failed, stop self", t);
-            stopSelf();
-        }
+        wm.addView(webView, params);
     }
 
     @Override

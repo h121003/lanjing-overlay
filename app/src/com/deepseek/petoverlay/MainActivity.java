@@ -2,8 +2,6 @@ package com.deepseek.petoverlay;
 
 import android.app.Activity;
 import android.content.Intent;
-import android.content.pm.PackageManager;
-import android.os.Build;
 import android.net.Uri;
 import android.os.Bundle;
 import android.provider.Settings;
@@ -15,13 +13,6 @@ import android.widget.TextView;
 
 public class MainActivity extends Activity {
     private TextView status;
-
-    /** Android 13+ 需要 POST_NOTIFICATIONS 才能显示前台服务的常驻通知；拒绝也不影响悬浮窗本身。 */
-    private void requestNotificationPermissionIfNeeded() {
-        if (Build.VERSION.SDK_INT < 33) return;
-        if (checkSelfPermission("android.permission.POST_NOTIFICATIONS") == PackageManager.PERMISSION_GRANTED) return;
-        requestPermissions(new String[]{"android.permission.POST_NOTIFICATIONS"}, 1001);
-    }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -55,7 +46,6 @@ public class MainActivity extends Activity {
                     status.setText("还没有悬浮窗权限，请先点第 1 步授予");
                     return;
                 }
-                requestNotificationPermissionIfNeeded();
                 Intent i = new Intent(MainActivity.this, OverlayService.class);
                 startService(i);
                 status.setText("已启动！回到桌面看看，可以拖动它");
