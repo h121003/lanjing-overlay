@@ -100,7 +100,7 @@ public class MainActivity extends Activity {
             @Override public void onTabSelected(int index) { show(index); }
         });
         column.addView(bar, new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, dp(84)));
+                LinearLayout.LayoutParams.MATCH_PARENT, dp(76)));
 
         setContentView(root);
         applyInsets(root);

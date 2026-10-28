@@ -54,6 +54,10 @@ public class GlassBottomBar extends View {
     private int rootW = 1, rootH = 1;
 
     private boolean dragging = false;
+    private float barOffsetX = 0f;   // 整条栏的轻微位移
+    private float pressBoost = 0f;   // 按下时图标放大
+    private int pressedIndex = -1;
+    private ValueAnimator pressAnim;
     private float downX = 0f;
     private float dragStartCenter = 0f;
     private float lastX = 0f;
@@ -126,7 +130,7 @@ public class GlassBottomBar extends View {
 
     @Override
     protected void onSizeChanged(int w, int h, int ow, int oh) {
-        float mx = dp(14f), my = dp(9f);
+        float mx = dp(18f), my = dp(10f);
         barRect.set(mx, my, w - mx, h - my);
         if (lensCenterX < 0) lensCenterX = centerOf(selected);
     }
@@ -138,12 +142,21 @@ public class GlassBottomBar extends View {
         super.onDraw(c);
         float r = barRect.height() / 2f;
 
+        // 整条栏跟着透镜轻微横移（视差感）
+        float center = (barRect.left + barRect.right) / 2f;
+        float target = (lensCenterX - center) * 0.035f;
+        float max = dp(7f);
+        barOffsetX = Math.max(-max, Math.min(max, target));
+
+        c.save();
+        c.translate(barOffsetX, 0f);
         if (!active) {
             drawIdle(c, r);
         } else {
             drawActive(c, r);
         }
         drawItems(c);
+        c.restore();
     }
 
     /** 静止态：普通导航栏 */
@@ -277,13 +290,18 @@ public class GlassBottomBar extends View {
             float falloff = Math.max(0f, 1f - dist / (slot * 0.85f));
             float amt = active ? deform * falloff : 0f;
 
-            if (amt > 0.01f) {
+            // 选中/按下时整体放大一点点
+            float boost = (on ? 0.06f : 0f) + (i == pressedIndex ? pressBoost * 0.10f : 0f);
+            float sx = 1f + boost + amt * 0.24f;
+            float sy = 1f + boost - amt * 0.18f;
+
+            if (Math.abs(sx - 1f) > 0.005f || Math.abs(sy - 1f) > 0.005f) {
                 c.save();
-                c.scale(1f + amt * 0.26f, 1f - amt * 0.20f, ccx, barRect.centerY());
+                c.scale(sx, sy, ccx, barRect.centerY());
             }
             drawIcon(c, i, ccx, barRect.centerY() - dp(6f), dp(8.5f));
             c.drawText(LABELS[i], ccx, barRect.centerY() + dp(17f), labelPaint);
-            if (amt > 0.01f) c.restore();
+            if (Math.abs(sx - 1f) > 0.005f || Math.abs(sy - 1f) > 0.005f) c.restore();
         }
     }
 
@@ -333,6 +351,9 @@ public class GlassBottomBar extends View {
             case MotionEvent.ACTION_DOWN:
                 if (anim != null) anim.cancel();
                 setActive(true);
+                pressedIndex = (int) ((e.getX() - barRect.left) / slotWidth());
+                pressedIndex = Math.max(0, Math.min(LABELS.length - 1, pressedIndex));
+                animatePress(1f, 110);
                 dragging = true;
                 downX = e.getX();
                 lastX = downX;
@@ -374,6 +395,8 @@ public class GlassBottomBar extends View {
                     target = nearestIndex(lensCenterX);
                 }
                 animateTo(target, true);
+                animatePress(0f, 180);
+                pressedIndex = -1;
                 removeCallbacks(decay);
                 postDelayed(decay, 120);
                 postDelayed(new Runnable() {
@@ -385,6 +408,19 @@ public class GlassBottomBar extends View {
             }
         }
         return true;
+    }
+
+    private void animatePress(final float to, int duration) {
+        if (pressAnim != null) pressAnim.cancel();
+        pressAnim = ValueAnimator.ofFloat(pressBoost, to);
+        pressAnim.setDuration(duration);
+        pressAnim.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() {
+            @Override public void onAnimationUpdate(ValueAnimator v) {
+                pressBoost = (float) v.getAnimatedValue();
+                invalidate();
+            }
+        });
+        pressAnim.start();
     }
 
     private void setActive(boolean on) {
