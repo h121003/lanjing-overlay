@@ -46,17 +46,14 @@ public class GlassBottomBar extends View {
             "  float dist = length(d);\n" +
             "  float2 dir = dist > 0.001 ? d / dist : float2(0.0, 0.0);\n" +
             "  float r = clamp(dist / radius, 0.0, 1.0);\n" +
-            "  float z = sqrt(max(0.001, 1.0 - r * r));\n" +
-            "  float samp = atan(r / max(z, 0.02)) * 0.6366197;\n" +
-            "  float2 q = center + dir * (samp * radius / mag);\n" +
+            "  // 平面（X-Y）径向形变：中间收、边缘外扩，线条向圆周弯\n" +
+            "  float samp = r * (0.52 + 0.48 * r * r);\n" +
+            "  float2 q = center + dir * (samp * radius);\n" +
             "  float e = disp * smoothstep(radius * 0.80, radius, dist);\n" +
             "  half4 cr = content.eval(q - dir * e);\n" +
             "  half4 cg = content.eval(q);\n" +
             "  half4 cb = content.eval(q + dir * e);\n" +
             "  half4 col = half4(cr.r, cg.g, cb.b, half(1.0));\n" +
-            "  // 球面明暗 + 高光，做出 Z 轴的立体感\n" +
-            "  col.rgb *= half(0.80 + 0.20 * z);\n" +
-            "  col.rgb += half(pow(max(z, 0.0), 10.0) * 0.30);\n" +
             "  return col;\n" +
             "}\n";
 
