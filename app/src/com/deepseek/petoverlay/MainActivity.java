@@ -34,6 +34,11 @@ public class MainActivity extends Activity {
     private static final String PREFS = "lanjing";
     private static final String KEY_WALLPAPER = "wallpaper_uri";
 
+    private static final String KEY_THEME = "theme"; // system / light / dark
+
+    private boolean dark;
+    private int cBg, cText, cSub, cCard, cCardText;
+
     private final View[] pages = new View[4];
     private FrameLayout content;
     private ImageView wallpaper;
@@ -44,19 +49,28 @@ public class MainActivity extends Activity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
+        dark = resolveDark();
+        if (dark) {
+            cBg = 0xFF0F1114; cText = 0xFFFFFFFF; cSub = 0xFFD3DCE6;
+            cCard = 0xCC1B2027; cCardText = 0xFFE8EEF4;
+        } else {
+            cBg = 0xFFF4F6F9; cText = 0xFF11161C; cSub = 0xFF4A5560;
+            cCard = 0xFFE3E9F0; cCardText = 0xFF131A21;
+        }
+
         FrameLayout root = new FrameLayout(this);
         rootView = root;
 
         wallpaper = new ImageView(this);
         wallpaper.setScaleType(ImageView.ScaleType.CENTER_CROP);
-        wallpaper.setBackgroundColor(0xFF0F1114);
+        wallpaper.setBackgroundColor(cBg);
         root.addView(wallpaper, new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
         applyWallpaper();
 
         // 壁纸上的暗色蒙版，保证文字可读
         View scrim = new View(this);
-        scrim.setBackgroundColor(0xB3000000);
+        scrim.setBackgroundColor(dark ? 0xB3000000 : 0x66FFFFFF);
         root.addView(scrim, new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
 
@@ -80,6 +94,8 @@ public class MainActivity extends Activity {
         show(0);
 
         bar = new GlassBottomBar(this);
+        bar.setDark(dark);
+        bar.setTint(dark ? 0xFF22262C : 0xFFE7ECF2);
         bar.setOnTabSelected(new GlassBottomBar.OnTabSelected() {
             @Override public void onTabSelected(int index) { show(index); }
         });
@@ -176,7 +192,7 @@ public class MainActivity extends Activity {
             @Override public void onClick(View v) {
                 prefs().edit().remove(KEY_WALLPAPER).apply();
                 wallpaper.setImageDrawable(null);
-                wallpaper.setBackgroundColor(0xFF0F1114);
+                wallpaper.setBackgroundColor(cBg);
                 toast("已恢复默认背景");
             }
         });
@@ -194,6 +210,16 @@ public class MainActivity extends Activity {
             @Override public void onClick(View v) { OverlayService.resize(-80); }
         });
         ll.addView(smaller);
+
+        Button reset = primary("恢复默认大小");
+        reset.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View v) {
+                if (!OverlayService.isRunning()) { toast("悬浮宠物还没启动"); return; }
+                OverlayService.resetSize();
+                toast("已恢复默认大小");
+            }
+        });
+        ll.addView(reset);
         return wrap(ll);
     }
 
@@ -202,6 +228,12 @@ public class MainActivity extends Activity {
     private View buildSettingsPage() {
         LinearLayout ll = pageInner();
         ll.addView(sectionTitle("设置"));
+        ll.addView(caption("主题"));
+        String cur = prefs().getString(KEY_THEME, "system");
+        ll.addView(themeButton("跟随系统", "system", cur));
+        ll.addView(themeButton("浅色（白色）", "light", cur));
+        ll.addView(themeButton("深色（黑色）", "dark", cur));
+        ll.addView(gap(dp(6)));
         ll.addView(hint("悬浮窗权限：" + (Settings.canDrawOverlays(this) ? "已授予" : "未授予")));
         ll.addView(hint("通知权限：" + (hasNotificationPermission() ? "已授予" : "未授予（不影响悬浮窗）")));
 
@@ -331,6 +363,26 @@ public class MainActivity extends Activity {
         }
     }
 
+    private boolean resolveDark() {
+        String t = getSharedPreferences(PREFS, MODE_PRIVATE).getString(KEY_THEME, "system");
+        if ("dark".equals(t)) return true;
+        if ("light".equals(t)) return false;
+        int mode = getResources().getConfiguration().uiMode
+                & android.content.res.Configuration.UI_MODE_NIGHT_MASK;
+        return mode == android.content.res.Configuration.UI_MODE_NIGHT_YES;
+    }
+
+    private Button themeButton(String label, final String value, String current) {
+        Button b = primary(value.equals(current) ? "✓ " + label : label);
+        b.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View v) {
+                prefs().edit().putString(KEY_THEME, value).apply();
+                recreate();
+            }
+        });
+        return b;
+    }
+
     private SharedPreferences prefs() {
         return getSharedPreferences(PREFS, MODE_PRIVATE);
     }
@@ -356,7 +408,7 @@ public class MainActivity extends Activity {
         v.setText(t);
         v.setTextSize(24);
         v.setTypeface(Typeface.DEFAULT_BOLD);
-        v.setTextColor(Color.WHITE);
+        v.setTextColor(cText);
         v.setPadding(0, 0, 0, dp(6));
         return v;
     }
@@ -365,7 +417,7 @@ public class MainActivity extends Activity {
         TextView v = new TextView(this);
         v.setText(t);
         v.setTextSize(14);
-        v.setTextColor(0xFFD3DCE6);
+        v.setTextColor(cSub);
         v.setLineSpacing(dp(4), 1f);
         v.setPadding(0, dp(4), 0, dp(12));
         return v;
@@ -375,7 +427,7 @@ public class MainActivity extends Activity {
         TextView v = new TextView(this);
         v.setText(t);
         v.setTextSize(13);
-        v.setTextColor(0xFF9FB0C0);
+        v.setTextColor(cSub);
         v.setPadding(0, dp(16), 0, dp(6));
         return v;
     }
@@ -385,8 +437,8 @@ public class MainActivity extends Activity {
         b.setText(text);
         b.setAllCaps(false);
         b.setTextSize(15);
-        b.setBackgroundColor(0xCC1B2027);
-        b.setTextColor(0xFFE8EEF4);
+        b.setBackgroundColor(cCard);
+        b.setTextColor(cCardText);
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, dp(46));
         lp.bottomMargin = dp(8);

@@ -47,6 +47,7 @@ public class GlassBottomBar extends View {
     private float lensCenterX = -1f;
     private float deform = 0f;          // 0..1，越大越扁
     private boolean active = false;
+    private boolean dark = true;
     private OnTabSelected listener;
 
     private Bitmap backdrop;            // 壁纸缩略图，用于透镜折射
@@ -106,6 +107,11 @@ public class GlassBottomBar extends View {
         invalidate();
     }
 
+    public void setDark(boolean d) {
+        dark = d;
+        invalidate();
+    }
+
     /** 采样自壁纸的颜色 */
     public void setTint(int color) {
         tintColor = color;
@@ -144,7 +150,7 @@ public class GlassBottomBar extends View {
     private void drawIdle(Canvas c, float r) {
         p.setShader(null);
         p.setStyle(Paint.Style.FILL);
-        p.setColor(0xEE151A20);
+        p.setColor(dark ? 0xEE151A20 : 0xEEF2F5F9);
         p.setShadowLayer(dp(8f), 0, dp(3f), 0x33000000);
         c.drawRoundRect(barRect, r, r, p);
         p.clearShadowLayer();
@@ -155,10 +161,10 @@ public class GlassBottomBar extends View {
         float h = barRect.height() - dp(14f);
         RectF sel = new RectF(lensCenterX - w / 2f, barRect.centerY() - h / 2f,
                 lensCenterX + w / 2f, barRect.centerY() + h / 2f);
-        p.setColor(0x1FFFFFFF);
+        p.setColor(dark ? 0x1FFFFFFF : 0x12000000);
         c.drawRoundRect(sel, h / 2f, h / 2f, p);
 
-        stroke.setColor(0x1AFFFFFF);
+        stroke.setColor(dark ? 0x1AFFFFFF : 0x1A000000);
         c.drawRoundRect(barRect, r, r, stroke);
     }
 
@@ -262,7 +268,7 @@ public class GlassBottomBar extends View {
         for (int i = 0; i < LABELS.length; i++) {
             float ccx = barRect.left + slot * (i + 0.5f);
             boolean on = i == selected;
-            int color = on ? ACCENT : (active ? 0xEEFFFFFF : 0xCCFFFFFF);
+            int color = on ? ACCENT : (active || dark ? 0xEEFFFFFF : 0xCC111820);
             iconPaint.setColor(color);
             labelPaint.setColor(color);
 

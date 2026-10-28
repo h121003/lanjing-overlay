@@ -33,13 +33,30 @@ public class OverlayService extends Service {
     private long downTime;
     private int size = 460;
 
+    private static final int DEFAULT_SIZE = 460;
+
     public static void resize(int delta) {
         if (instance != null && instance.webView != null) {
-            instance.size = Math.max(180, instance.size + delta);
-            instance.params.width = instance.size;
-            instance.params.height = instance.size;
-            instance.wm.updateViewLayout(instance.webView, instance.params);
+            applySize(Math.max(180, instance.size + delta));
         }
+    }
+
+    /** 恢复默认大小，立即生效，不用重启服务 */
+    public static void resetSize() {
+        if (instance != null && instance.webView != null) {
+            applySize(DEFAULT_SIZE);
+        }
+    }
+
+    public static boolean isRunning() {
+        return instance != null && instance.webView != null;
+    }
+
+    private static void applySize(int px) {
+        instance.size = px;
+        instance.params.width = px;
+        instance.params.height = px;
+        instance.wm.updateViewLayout(instance.webView, instance.params);
     }
 
     @Override
