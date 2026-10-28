@@ -329,7 +329,12 @@ public class MainActivity extends Activity {
                     }
                     if (n == 0) return;
                     final int color = 0xFF000000 | (int) (r / n) << 16 | (int) (g / n) << 8 | (int) (bl / n);
-                    final android.graphics.Bitmap thumb = bmp;
+                    // 生成一张模糊缩略图，给玻璃当「背景模糊」
+                    android.graphics.Bitmap small = android.graphics.Bitmap.createScaledBitmap(
+                            bmp, Math.max(8, bmp.getWidth() / 10), Math.max(8, bmp.getHeight() / 10), true);
+                    final android.graphics.Bitmap blurry = android.graphics.Bitmap.createScaledBitmap(
+                            small, bmp.getWidth() * 4, bmp.getHeight() * 4, true);
+                    final android.graphics.Bitmap thumb = blurry;
                     runOnUiThread(new Runnable() {
                         @Override public void run() {
                             if (bar == null) return;

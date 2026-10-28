@@ -192,9 +192,21 @@ public class GlassBottomBar extends View {
         p.clearShadowLayer();
 
         boolean hasBg = backdrop != null;
-        // 玻璃本体：有壁纸时用壁纸色，没壁纸时用深色磨砂
+        // 玻璃本体：有壁纸时先用模糊壁纸打底，再叠色
         p.setColor(withAlpha(tintColor, hasBg ? 0x99 : 0xE6));
         c.drawRoundRect(barRect, r, r, p);
+        if (hasBg) {
+            c.save();
+            Path bgClip = new Path();
+            bgClip.addRoundRect(barRect, r, r, Path.Direction.CW);
+            c.clipPath(bgClip);
+            Rect srcAll = new Rect(0, 0, backdrop.getWidth(), backdrop.getHeight());
+            RectF dstAll = new RectF(0, 0, rootW, rootH);
+            p.setAlpha(0x99);
+            c.drawBitmap(backdrop, srcAll, dstAll, p);
+            p.setAlpha(255);
+            c.restore();
+        }
 
         // 白色渐变：没有壁纸时非常克制，避免变成一块灰片
         int a1 = hasBg ? 0x24 : 0x1F, a2 = hasBg ? 0x10 : 0x0D, a3 = hasBg ? 0x06 : 0x05;
