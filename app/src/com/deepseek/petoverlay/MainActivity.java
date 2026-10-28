@@ -403,6 +403,12 @@ public class MainActivity extends Activity {
         return sc;
     }
 
+    private View gap(int h) {
+        View v = new View(this);
+        v.setLayoutParams(new LinearLayout.LayoutParams(1, dp(h)));
+        return v;
+    }
+
     private TextView sectionTitle(String t) {
         TextView v = new TextView(this);
         v.setText(t);
