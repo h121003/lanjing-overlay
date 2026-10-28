@@ -32,7 +32,7 @@ public class GlassBottomBar extends View {
     private static final float BAR_H_DP = 56f;
     private static final float MARGIN_X_DP = 18f;
     private static final float MARGIN_BOTTOM_DP = 10f;
-    private static final float MAGNIFY = 1.18f;
+    private static final float MAGNIFY = 1.30f;
 
     /** 折射 + 色散：中心放大，边缘把 RGB 三个通道往不同方向偏 */
     private static final String AGSL =
@@ -46,7 +46,7 @@ public class GlassBottomBar extends View {
             "  float dist = length(d);\n" +
             "  float2 dir = dist > 0.001 ? d / dist : float2(0.0, 0.0);\n" +
             "  float r = dist / radius;\n" +
-            "  float bend = 1.0 + 0.55 * r * r + 0.35 * r * r * r * r;\n" +
+            "  float bend = 1.0 + 0.12 * r * r + 0.06 * r * r * r * r;\n" +
             "  float2 q = center + dir * (dist * bend / mag);\n" +
             "  float e = disp * smoothstep(radius * 0.80, radius, dist);\n" +
             "  half4 cr = content.eval(q - dir * e);\n" +
@@ -263,7 +263,7 @@ public class GlassBottomBar extends View {
         rsCls.getMethod("setFloatUniform", String.class, float.class)
                 .invoke(rs, "mag", MAGNIFY);
         rsCls.getMethod("setFloatUniform", String.class, float.class)
-                .invoke(rs, "disp", dp(1.1f));
+                .invoke(rs, "disp", dp(0.8f));
         runtimeShader = rs;
         return (Shader) rs;
     }
