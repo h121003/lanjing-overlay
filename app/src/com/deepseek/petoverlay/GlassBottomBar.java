@@ -213,7 +213,19 @@ public class GlassBottomBar extends View {
             case MotionEvent.ACTION_CANCEL:
                 if (!dragging) return true;
                 dragging = false;
-                int target = nearestIndex(lensCenterX);
+                float moved = Math.abs(e.getX() - downX);
+                boolean tap = e.getActionMasked() == MotionEvent.ACTION_UP
+                        && moved < getResources().getDisplayMetrics().density * 8f;
+                int target;
+                if (tap) {
+                    // 单击：直接跳到手指所在的那一格
+                    float slotW = slotWidth();
+                    target = (int) ((e.getX() - barRect.left) / slotW);
+                    target = Math.max(0, Math.min(LABELS.length - 1, target));
+                } else {
+                    // 拖动：吸附到最近的一格
+                    target = nearestIndex(lensCenterX);
+                }
                 animateTo(target, true);
                 return true;
         }
