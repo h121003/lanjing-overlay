@@ -1,46 +1,36 @@
 # 路线图
 
-当前版本：**v1.0-legacy**
-下一版本：**v1.1**，预计 **2026-11-01** 发布
+当前版本：**v1.1**
+下一版本：**v1.2**（规划中）
 
 ---
 
-## v1.1 — 进行中
+## v1.1 — 已完成（2026-11-01 发布）
 
-目标：新增一批宠物动画，并清理 v1.0 遗留问题。
+目标：扩充动画素材，补齐联系方式入口，修掉一批稳定性问题。
 
 - [x] 仓库开源（源码 + MIT 许可证 + 构建文档）
-- [ ] 新增若干宠物动画
-- [ ] 修复 v1.0 的 assets 重复打包问题（12 段变 24 段、体积翻倍）
-- [ ] 重新构建并发布 APK
-- [ ] 更新 README 的版本号与下载入口
+- [x] 动画从 12 段扩充到 **106 段**
+- [x] 新增「关于 / 联系方式」页（QQ 群、Telegram、微信赞赏码、GitHub）
+- [x] 修复 WebView 上下文导致的偶发崩溃
+- [x] 修复服务销毁时的内存泄漏
+- [x] 悬浮窗权限被撤销时不再崩溃
+- [x] 修复横屏后画面拉伸
+- [x] 切换动画时预加载，减少卡顿
+- [x] 画面未就绪时点击不再丢失
+- [x] 重新构建并发布 APK
+- [x] 更新 README 的版本号与下载入口
 
 > 动画素材的授权尚在与素材作者沟通中（见
-> [素材来源](../README.md#素材来源)），确定后再决定 v1.1 是否随包分发素材。
+> [素材来源](../README.md#素材来源)），因此仓库不分发素材，仅在安装包内使用。
 
-## v1.2 — 进行中
+## v1.2 — 规划中
 
-### 安全加固
+- [ ] 继续优化稳定性与机型兼容性
+- [ ] 改善缩放与拖拽的手感
+- [ ] 支持自定义动画导入
 
-- [ ] `targetSdk` 28 → 33，补充 `POST_NOTIFICATIONS` 运行时申请
-- [ ] WebView 收紧：关闭 `allowContentAccess` / `DomStorage` / 跨源文件访问
-- [ ] `allowBackup="false"`，禁止 `adb backup` 导出应用数据
-- [ ] `setFilterTouchesWhenObscured(true)`，防悬浮窗被覆盖时误触
-- [ ] 发布版关闭调试日志
-- [ ] `addView` 异常保护（权限被撤销时不崩溃）
-
-### 稳定性修复
-
-- [x] WebView 改用 `getApplicationContext()`，避免部分 ROM 因 Service 无窗口令牌而崩
-- [x] `onDestroy` 调用 `webView.destroy()` 并 `stopForeground(true)`，修复内存泄漏
-- [x] `addView` 加 try/catch，失败时优雅退出
-- [x] canvas 监听 `resize` / `orientationchange`，修复横屏后画面拉伸
-
-### 待排期
-
-- [ ] 切换动画时预加载下一段，减少卡顿
-- [ ] 页面未加载完时的点击兜底
-- [ ] 缩放后同步 WebView 布局
+具体排期以 [Releases](https://github.com/h121003/lanjing-overlay/releases) 为准。
 
 ---
 
