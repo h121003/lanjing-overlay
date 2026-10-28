@@ -38,12 +38,14 @@ public class MainActivity extends Activity {
     private FrameLayout content;
     private ImageView wallpaper;
     private GlassBottomBar bar;
+    private FrameLayout rootView;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
         FrameLayout root = new FrameLayout(this);
+        rootView = root;
 
         wallpaper = new ImageView(this);
         wallpaper.setScaleType(ImageView.ScaleType.CENTER_CROP);
@@ -295,8 +297,13 @@ public class MainActivity extends Activity {
                     }
                     if (n == 0) return;
                     final int color = 0xFF000000 | (int) (r / n) << 16 | (int) (g / n) << 8 | (int) (bl / n);
+                    final android.graphics.Bitmap thumb = bmp;
                     runOnUiThread(new Runnable() {
-                        @Override public void run() { if (bar != null) bar.setTint(color); }
+                        @Override public void run() {
+                            if (bar == null) return;
+                            bar.setTint(color);
+                            bar.setBackdrop(thumb, rootView.getWidth(), rootView.getHeight());
+                        }
                     });
                 } catch (Exception ignored) {
                 }
