@@ -256,7 +256,7 @@ public class GlassBottomBar extends View {
         stroke.setColor(0x33FFFFFF);
     }
 
-    /** 图标 + 文字；选中项跟随透镜做轻微形变，比例才对得上 */
+    /** 图标 + 文字；透镜扫过谁，谁就形变（跟位置无关，跟距离有关） */
     private void drawItems(Canvas c) {
         float slot = slotWidth();
         for (int i = 0; i < LABELS.length; i++) {
@@ -266,14 +266,18 @@ public class GlassBottomBar extends View {
             iconPaint.setColor(color);
             labelPaint.setColor(color);
 
-            boolean deformThis = active && on && deform > 0.01f;
-            if (deformThis) {
+            // 距离透镜越近，形变越强；离开就恢复原样
+            float dist = Math.abs(ccx - lensCenterX);
+            float falloff = Math.max(0f, 1f - dist / (slot * 0.85f));
+            float amt = active ? deform * falloff : 0f;
+
+            if (amt > 0.01f) {
                 c.save();
-                c.scale(1f + deform * 0.22f, 1f - deform * 0.16f, ccx, barRect.centerY());
+                c.scale(1f + amt * 0.26f, 1f - amt * 0.20f, ccx, barRect.centerY());
             }
             drawIcon(c, i, ccx, barRect.centerY() - dp(6f), dp(8.5f));
             c.drawText(LABELS[i], ccx, barRect.centerY() + dp(17f), labelPaint);
-            if (deformThis) c.restore();
+            if (amt > 0.01f) c.restore();
         }
     }
 
