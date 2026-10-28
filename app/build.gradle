@@ -10,8 +10,8 @@ android {
         applicationId 'com.deepseek.petoverlay'
         minSdk 26
         targetSdk 33
-        versionCode 4
-        versionName '1.2'
+        versionCode 6
+        versionName '1.2.0'
     }
 
     // 沿用现有目录结构：源码在 app/src，清单在 app/AndroidManifest.xml
