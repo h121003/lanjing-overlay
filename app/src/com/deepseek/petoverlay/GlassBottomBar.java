@@ -45,7 +45,9 @@ public class GlassBottomBar extends View {
             "  float2 d = p - center;\n" +
             "  float dist = length(d);\n" +
             "  float2 dir = dist > 0.001 ? d / dist : float2(0.0, 0.0);\n" +
-            "  float2 q = center + d / mag;\n" +
+            "  float r = dist / radius;\n" +
+            "  float bend = 1.0 + 0.55 * r * r + 0.35 * r * r * r * r;\n" +
+            "  float2 q = center + dir * (dist * bend / mag);\n" +
             "  float e = disp * smoothstep(radius * 0.80, radius, dist);\n" +
             "  half4 cr = content.eval(q - dir * e);\n" +
             "  half4 cg = content.eval(q);\n" +
