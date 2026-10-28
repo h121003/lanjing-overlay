@@ -285,23 +285,26 @@ public class GlassBottomBar extends View {
             iconPaint.setColor(color);
             labelPaint.setColor(color);
 
-            // 距离透镜越近，形变越强；离开就恢复原样
+            // 距离透镜越近，形变越强；但只让「图标」形变，文字保持清晰
             float dist = Math.abs(ccx - lensCenterX);
             float falloff = Math.max(0f, 1f - dist / (slot * 0.85f));
             float amt = active ? deform * falloff : 0f;
-
-            // 选中/按下时整体放大一点点
             float boost = (on ? 0.06f : 0f) + (i == pressedIndex ? pressBoost * 0.10f : 0f);
-            float sx = 1f + boost + amt * 0.24f;
-            float sy = 1f + boost - amt * 0.18f;
 
-            if (Math.abs(sx - 1f) > 0.005f || Math.abs(sy - 1f) > 0.005f) {
-                c.save();
-                c.scale(sx, sy, ccx, barRect.centerY());
-            }
+            // 图标：放大 + 随透镜压扁
+            float isx = 1f + boost + amt * 0.24f;
+            float isy = 1f + boost - amt * 0.18f;
+            c.save();
+            c.scale(isx, isy, ccx, barRect.centerY() - dp(6f));
             drawIcon(c, i, ccx, barRect.centerY() - dp(6f), dp(8.5f));
+            c.restore();
+
+            // 文字：只轻微放大，不参与压扁，保证可读
+            float ts = 1f + boost * 0.5f;
+            c.save();
+            c.scale(ts, ts, ccx, barRect.centerY() + dp(17f));
             c.drawText(LABELS[i], ccx, barRect.centerY() + dp(17f), labelPaint);
-            if (Math.abs(sx - 1f) > 0.005f || Math.abs(sy - 1f) > 0.005f) c.restore();
+            c.restore();
         }
     }
 
