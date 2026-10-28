@@ -47,6 +47,8 @@ public class GlassBottomBar extends View {
     private final Path iconPath = new Path();
 
     private int selected = 0;
+    /** 玻璃「吸收」的背景色：由调用方从壁纸底部采样，让玻璃看起来像真的透了背景 */
+    private int tintColor = 0xFF2A2F36;
     private float lensCenterX = -1f;
     private float stretch = 0f;          // 0 = 正常, >0 = 横向拉伸
     private OnTabSelected listener;
@@ -78,11 +80,16 @@ public class GlassBottomBar extends View {
         labelPaint.setTextAlign(Paint.Align.CENTER);
         labelPaint.setTextSize(dp(11f));
 
-        specularPaint.setShader(new LinearGradient(0, 0, 0, dp(28f),
-                0x40FFFFFF, 0x00FFFFFF, Shader.TileMode.CLAMP));
+
     }
 
     public void setOnTabSelected(OnTabSelected l) { listener = l; }
+
+    /** 采样自壁纸底部的颜色，玻璃会吃这个色调 */
+    public void setTint(int color) {
+        tintColor = color;
+        invalidate();
+    }
 
     public int getSelected() { return selected; }
 
@@ -113,40 +120,91 @@ public class GlassBottomBar extends View {
         super.onDraw(c);
         float r = barRect.height() / 2f;
 
-        // 玻璃主体
-        c.drawRoundRect(barRect, r, r, glassPaint);
-        // 顶部高光
+        // 外阴影
+        Paint shadow = new Paint(Paint.ANTI_ALIAS_FLAG);
+        shadow.setColor(0x66000000);
+        shadow.setShadowLayer(dp(14f), 0, dp(6f), 0x66000000);
+        c.drawRoundRect(barRect, r, r, shadow);
+
+        // 玻璃主体：背景色打底 + 白色渐变叠加
+        Paint base = new Paint(Paint.ANTI_ALIAS_FLAG);
+        base.setColor(withAlpha(tintColor, 0xD8));
+        c.drawRoundRect(barRect, r, r, base);
+
+        Paint glass = new Paint(Paint.ANTI_ALIAS_FLAG);
+        glass.setShader(new LinearGradient(0, barRect.top, 0, barRect.bottom,
+                new int[]{0x47FFFFFF, 0x1AFFFFFF, 0x0AFFFFFF},
+                new float[]{0f, 0.45f, 1f}, Shader.TileMode.CLAMP));
+        c.drawRoundRect(barRect, r, r, glass);
+
+        // 顶部高光条（模拟光从上方打进玻璃边缘）
         c.save();
         Path clip = new Path();
         clip.addRoundRect(barRect, r, r, Path.Direction.CW);
         c.clipPath(clip);
-        c.drawRect(barRect.left, barRect.top, barRect.right, barRect.top + dp(28f), specularPaint);
+        Paint rim = new Paint(Paint.ANTI_ALIAS_FLAG);
+        rim.setShader(new LinearGradient(0, barRect.top, 0, barRect.top + dp(22f),
+                0x8CFFFFFF, 0x00FFFFFF, Shader.TileMode.CLAMP));
+        c.drawRect(barRect.left, barRect.top, barRect.right, barRect.top + dp(22f), rim);
+        // 底部内侧暗边，让切口更「厚」
+        Paint inner = new Paint(Paint.ANTI_ALIAS_FLAG);
+        inner.setShader(new LinearGradient(0, barRect.bottom - dp(16f), 0, barRect.bottom,
+                0x00000000, 0x40000000, Shader.TileMode.CLAMP));
+        c.drawRect(barRect.left, barRect.bottom - dp(16f), barRect.right, barRect.bottom, inner);
         c.restore();
-        c.drawRoundRect(barRect, r, r, strokePaint);
+
+        // 描边：上面亮、下面暗
+        Paint edge = new Paint(Paint.ANTI_ALIAS_FLAG);
+        edge.setStyle(Paint.Style.STROKE);
+        edge.setStrokeWidth(dp(1.2f));
+        edge.setShader(new LinearGradient(0, barRect.top, 0, barRect.bottom,
+                0x73FFFFFF, 0x1FFFFFFF, Shader.TileMode.CLAMP));
+        c.drawRoundRect(barRect, r, r, edge);
 
         // 透镜
         float slot = slotWidth();
-        float lensW = slot - dp(10f);
-        float lensH = barRect.height() - dp(10f);
+        float lensW = slot - dp(8f);
+        float lensH = barRect.height() - dp(8f);
         float cx = lensCenterX;
         float drawW = lensW * (1f + stretch * 0.35f);
         float drawH = lensH * (1f - stretch * 0.18f);
         lensRect.set(cx - drawW / 2f, barRect.centerY() - drawH / 2f,
                 cx + drawW / 2f, barRect.centerY() + drawH / 2f);
         float lr = drawH / 2f;
-        c.drawRoundRect(lensRect, lr, lr, lensPaint);
-        c.drawRoundRect(lensRect, lr, lr, lensStroke);
+
+        // 透镜本体：更亮的玻璃 + 边缘高光
+        Paint lens = new Paint(Paint.ANTI_ALIAS_FLAG);
+        lens.setShader(new LinearGradient(0, lensRect.top, 0, lensRect.bottom,
+                0x5CFFFFFF, 0x1AFFFFFF, Shader.TileMode.CLAMP));
+        c.drawRoundRect(lensRect, lr, lr, lens);
+
+        Paint lensEdge = new Paint(Paint.ANTI_ALIAS_FLAG);
+        lensEdge.setStyle(Paint.Style.STROKE);
+        lensEdge.setStrokeWidth(dp(1.4f));
+        lensEdge.setColor(0x8CFFFFFF);
+        c.drawRoundRect(lensRect, lr, lr, lensEdge);
+
+        // 透镜顶部弧形高光
+        Paint gloss = new Paint(Paint.ANTI_ALIAS_FLAG);
+        gloss.setShader(new LinearGradient(0, lensRect.top, 0, lensRect.top + drawH * 0.45f,
+                0x66FFFFFF, 0x00FFFFFF, Shader.TileMode.CLAMP));
+        c.drawRoundRect(new RectF(lensRect.left + dp(2f), lensRect.top + dp(2f),
+                lensRect.right - dp(2f), lensRect.top + drawH * 0.5f), lr, lr, gloss);
 
         // 图标与文字
         for (int i = 0; i < LABELS.length; i++) {
             float ccx = barRect.left + slot * (i + 0.5f);
             boolean on = i == selected;
-            int color = on ? ACCENT : 0xB0FFFFFF;
+            int color = on ? ACCENT : 0xCCFFFFFF;
             iconPaint.setColor(color);
             labelPaint.setColor(color);
             drawIcon(c, i, ccx, barRect.centerY() - dp(7f), dp(9.5f));
             c.drawText(LABELS[i], ccx, barRect.centerY() + dp(19f), labelPaint);
         }
+    }
+
+    private static int withAlpha(int color, int alpha) {
+        return (color & 0x00FFFFFF) | (alpha << 24);
     }
 
     /** 用 Path 画简单线性图标，避免引入图片资源 */

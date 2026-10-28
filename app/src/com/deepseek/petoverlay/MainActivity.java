@@ -267,8 +267,41 @@ public class MainActivity extends Activity {
         if (s == null) return;
         try {
             wallpaper.setImageURI(Uri.parse(s));
+            sampleTint(Uri.parse(s));
         } catch (Exception ignored) {
         }
+    }
+
+    /** 从壁纸底部采样平均色，喂给玻璃做「透背景」的色调 */
+    private void sampleTint(final Uri uri) {
+        new Thread(new Runnable() {
+            @Override public void run() {
+                try {
+                    BitmapFactory.Options o = new BitmapFactory.Options();
+                    o.inSampleSize = 16;
+                    android.graphics.Bitmap bmp = getContentResolver()
+                            .openInputStream(uri) == null ? null : null;
+                    java.io.InputStream in = getContentResolver().openInputStream(uri);
+                    bmp = BitmapFactory.decodeStream(in, null, o);
+                    if (in != null) in.close();
+                    if (bmp == null) return;
+                    int w = bmp.getWidth(), h = bmp.getHeight();
+                    long r = 0, g = 0, bl = 0; int n = 0;
+                    for (int y = (int) (h * 0.78f); y < h; y++) {
+                        for (int x = 0; x < w; x++) {
+                            int p = bmp.getPixel(x, y);
+                            r += (p >> 16) & 0xFF; g += (p >> 8) & 0xFF; bl += p & 0xFF; n++;
+                        }
+                    }
+                    if (n == 0) return;
+                    final int color = 0xFF000000 | (int) (r / n) << 16 | (int) (g / n) << 8 | (int) (bl / n);
+                    runOnUiThread(new Runnable() {
+                        @Override public void run() { if (bar != null) bar.setTint(color); }
+                    });
+                } catch (Exception ignored) {
+                }
+            }
+        }).start();
     }
 
     @Override
@@ -285,6 +318,7 @@ public class MainActivity extends Activity {
         prefs().edit().putString(KEY_WALLPAPER, uri.toString()).apply();
         try {
             wallpaper.setImageURI(uri);
+            sampleTint(uri);
         } catch (Exception e) {
             toast("这张图读不出来，换一张试试");
         }
