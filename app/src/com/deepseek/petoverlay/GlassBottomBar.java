@@ -287,9 +287,15 @@ public class GlassBottomBar extends View {
         Rect out = new Rect();
         int w = (int) (rx * 2 / k), h = (int) (ry * 2 / k);
         out.set((int) cx - w / 2, (int) cy - h / 2, (int) cx + w / 2, (int) cy + h / 2);
+        // 限制在原图范围内，避免越界采样
+        if (out.left < 0) out.left = 0;
+        if (out.top < 0) out.top = 0;
+        if (out.right > src.getWidth()) out.right = src.getWidth();
+        if (out.bottom > src.getHeight()) out.bottom = src.getHeight();
+        if (out.width() <= 0 || out.height() <= 0) return;
         paint.setShader(null);
         paint.setAlpha(alpha);
-        c.drawBitmap(src, Region(out), dst, paint);
+        c.drawBitmap(src, out, dst, paint);
         paint.setAlpha(255);
     }
 
@@ -495,10 +501,5 @@ public class GlassBottomBar extends View {
         });
         anim.start();
         if (notify && listener != null) listener.onTabSelected(index);
-    }
-
-    /** 简易矩形区域（避免引入 android.graphics.Region 名冲突） */
-    private static class Region extends android.graphics.Rect {
-        Region(Rect r) { super(r); }
     }
 }
