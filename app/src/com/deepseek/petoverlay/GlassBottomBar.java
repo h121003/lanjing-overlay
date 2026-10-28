@@ -31,7 +31,7 @@ public class GlassBottomBar extends View {
     private static final int ACCENT = 0xFF11A34C;
     private static final float BAR_H_DP = 56f;
     private static final float MARGIN_X_DP = 18f;
-    private static final float MARGIN_BOTTOM_DP = 10f;
+    private static final float MARGIN_BOTTOM_DP = 22f;
     private static final float MAGNIFY = 1.30f;
 
     /** 折射 + 色散：中心放大，边缘把 RGB 三个通道往不同方向偏 */
@@ -190,11 +190,9 @@ public class GlassBottomBar extends View {
             drawMagnifiedFallback(c, cx, cy);
         }
 
-        // 玻璃色
-        paint.setShader(new LinearGradient(0, bubbleRect.top, 0, bubbleRect.bottom,
-                ((int) (0x22 * bubbleAlpha) << 24) | 0xFFFFFF,
-                ((int) (0x06 * bubbleAlpha) << 24) | 0xFFFFFF,
-                Shader.TileMode.CLAMP));
+        // 玻璃色：统一一层很淡的白，不做上下渐变（避免像球）
+        paint.setShader(null);
+        paint.setColor(((int) (0x0F * bubbleAlpha) << 24) | 0xFFFFFF);
         c.drawPath(bubblePath, paint);
 
         // 亮边
@@ -219,7 +217,11 @@ public class GlassBottomBar extends View {
             android.graphics.Bitmap bmp = android.graphics.Bitmap.createBitmap(
                     w, h, android.graphics.Bitmap.Config.ARGB_8888);
             Canvas cv = new Canvas(bmp);
-            drawBar(cv, barRect.height() / 2f);
+            // 只画纯色底 + 图标文字：不要选中丸/边框/阴影，避免放大后出现
+            // 同心渐变，看着像是个球
+            Paint bg = new Paint();
+            bg.setColor(dark ? 0xFF151A20 : 0xFFF2F5F9);
+            cv.drawRoundRect(barRect, barRect.height() / 2f, barRect.height() / 2f, bg);
             drawItems(cv);
             snapshot = bmp;
         } catch (Throwable t) {
