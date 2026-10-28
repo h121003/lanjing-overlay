@@ -4,25 +4,26 @@ import android.animation.ValueAnimator;
 import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
-import android.graphics.Color;
 import android.graphics.LinearGradient;
 import android.graphics.Paint;
 import android.graphics.Path;
+import android.graphics.RadialGradient;
 import android.graphics.Rect;
 import android.graphics.RectF;
 import android.graphics.Shader;
+import android.os.Build;
 import android.util.AttributeSet;
+import android.view.HapticFeedbackConstants;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.animation.DecelerateInterpolator;
 
 /**
- * 底部导航栏。
+ * 底部导航栏 + 液态玻璃气泡。
  *
- * 两种状态：
- *  - 静止：普通导航栏外观（纯色胶囊 + 图标文字），不做玻璃效果
- *  - 交互：按下 / 拖动 / 点击时切换成「液态玻璃」——玻璃底、透镜高光、
- *          透镜下的壁纸被放大折射、形变由速度驱动（快则压扁，慢则回弹）
+ * 交互时从选中项升起一个圆形玻璃气泡（直径 ≈ 栏高 × 1.35，允许超出栏体），
+ * 气泡内对「任务栏自身的截屏」做折射扭曲（Android 13+ 用 AGSL 片元着色器，
+ * 低版本降级为放大采样），移动时横向拉成椭圆，松手回圆并淡出。
  */
 public class GlassBottomBar extends View {
 
@@ -33,46 +34,57 @@ public class GlassBottomBar extends View {
     private static final String[] LABELS = {"宠物", "外观", "设置", "关于"};
     private static final int ACCENT = 0xFF11A34C;
 
+    /** 气泡内壁的折射：中心不动，靠近边缘处把背景往中心「吸」 */
+    private static final String LENS_AGSL =
+            "uniform shader content;\n" +
+            "uniform float2 center;\n" +
+            "uniform float radius;\n" +
+            "uniform float strength;\n" +
+            "half4 main(float2 p) {\n" +
+            "  float2 d = p - center;\n" +
+            "  float dist = length(d);\n" +
+            "  if (dist < 0.001 || dist > radius) { return content.eval(p); }\n" +
+            "  float t = 1.0 - dist / radius;\n" +
+            "  float2 dir = d / dist;\n" +
+            "  float2 offset = dir * (t * t) * strength;\n" +
+            "  return content.eval(p - offset);\n" +
+            "}\n";
+
     private final float density;
     private final RectF barRect = new RectF();
-    private final RectF lensRect = new RectF();
+    private final RectF bubbleRect = new RectF();
     private final Path iconPath = new Path();
-    private final Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
-    private final Paint stroke = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint iconPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint labelPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
 
     private int selected = 0;
     private int tintColor = 0xFF22262C;
-    private float lensCenterX = -1f;
-    private float deform = 0f;          // 0..1，越大越扁
-    private boolean active = false;
     private boolean dark = true;
-    private OnTabSelected listener;
+    private boolean active = false;
 
-    private Bitmap backdrop;            // 壁纸缩略图，用于透镜折射
+    private float lensCenterX = -1f;
+    private float deform = 0f;      // 0..1，速度驱动
+    private float bubbleAlpha = 0f; // 0..1，淡入淡出
+    private float pressBoost = 0f;
+
+    private Bitmap backdrop;        // 壁纸缩略图
     private int rootW = 1, rootH = 1;
 
+    private Bitmap selfTexture;     // 任务栏自身快照，供折射采样
+    private Object runtimeShader;   // android.graphics.RuntimeShader（反射持有）
+    private boolean shaderBroken = false;
+
     private boolean dragging = false;
-    private float barOffsetX = 0f;   // 整条栏的轻微位移
-    private float pressBoost = 0f;   // 按下时图标放大
     private int pressedIndex = -1;
-    private ValueAnimator pressAnim;
-    private float downX = 0f;
-    private float dragStartCenter = 0f;
-    private float lastX = 0f;
+    private float downX = 0f, dragStartCenter = 0f, lastX = 0f;
     private long lastT = 0L;
-    private ValueAnimator anim;
+    private ValueAnimator anim, alphaAnim, pressAnim;
 
     private final Runnable decay = new Runnable() {
         @Override public void run() {
-            deform *= 0.86f;
-            if (deform < 0.01f) {
-                deform = 0f;
-            } else {
-                postInvalidateOnAnimation();
-                postDelayed(this, 16);
-            }
+            deform *= 0.87f;
+            if (deform < 0.01f) deform = 0f; else postDelayed(this, 16);
             invalidate();
         }
     };
@@ -83,9 +95,6 @@ public class GlassBottomBar extends View {
         super(c, a);
         density = getResources().getDisplayMetrics().density;
         setLayerType(LAYER_TYPE_SOFTWARE, null);
-
-        stroke.setStyle(Paint.Style.STROKE);
-        stroke.setStrokeWidth(dp(1f));
         iconPaint.setStyle(Paint.Style.STROKE);
         iconPaint.setStrokeWidth(dp(1.8f));
         iconPaint.setStrokeCap(Paint.Cap.ROUND);
@@ -94,6 +103,7 @@ public class GlassBottomBar extends View {
     }
 
     public void setOnTabSelected(OnTabSelected l) { listener = l; }
+    private OnTabSelected listener;
 
     public int getSelected() { return selected; }
 
@@ -103,7 +113,10 @@ public class GlassBottomBar extends View {
         invalidate();
     }
 
-    /** 壁纸缩略图 + 根布局尺寸，用于透镜下的折射 */
+    public void setDark(boolean d) { dark = d; invalidate(); }
+
+    public void setTint(int color) { tintColor = color; invalidate(); }
+
     public void setBackdrop(Bitmap bmp, int w, int h) {
         backdrop = bmp;
         rootW = Math.max(1, w);
@@ -111,27 +124,13 @@ public class GlassBottomBar extends View {
         invalidate();
     }
 
-    public void setDark(boolean d) {
-        dark = d;
-        invalidate();
-    }
-
-    /** 采样自壁纸的颜色 */
-    public void setTint(int color) {
-        tintColor = color;
-        invalidate();
-    }
-
     private float dp(float v) { return v * density; }
-
     private float slotWidth() { return barRect.width() / LABELS.length; }
-
-    private float centerOf(int index) { return barRect.left + slotWidth() * (index + 0.5f); }
+    private float centerOf(int i) { return barRect.left + slotWidth() * (i + 0.5f); }
 
     @Override
     protected void onSizeChanged(int w, int h, int ow, int oh) {
-        float mx = dp(18f), my = dp(10f);
-        barRect.set(mx, my, w - mx, h - my);
+        barRect.set(dp(18f), dp(10f), w - dp(18f), h - dp(10f));
         if (lensCenterX < 0) lensCenterX = centerOf(selected);
     }
 
@@ -142,179 +141,191 @@ public class GlassBottomBar extends View {
         super.onDraw(c);
         float r = barRect.height() / 2f;
 
-        // 整条栏跟着透镜轻微横移（视差感）
+        // 整条栏微动（幅度很小）
         float center = (barRect.left + barRect.right) / 2f;
-        float target = (lensCenterX - center) * 0.035f;
-        float max = dp(7f);
-        barOffsetX = Math.max(-max, Math.min(max, target));
+        float shift = (lensCenterX - center) * 0.02f;
+        float max = dp(4f);
+        shift = Math.max(-max, Math.min(max, shift));
 
         c.save();
-        c.translate(barOffsetX, 0f);
-        if (!active) {
-            drawIdle(c, r);
+        c.translate(shift, 0f);
+
+        if (!active || bubbleAlpha < 0.02f) {
+            drawBarIdle(c, r);
         } else {
-            drawActive(c, r);
+            drawBarActive(c, r);
+            drawBubble(c);
         }
         drawItems(c);
         c.restore();
     }
 
-    /** 静止态：普通导航栏 */
-    private void drawIdle(Canvas c, float r) {
-        p.setShader(null);
-        p.setStyle(Paint.Style.FILL);
-        p.setColor(dark ? 0xEE151A20 : 0xEEF2F5F9);
-        p.setShadowLayer(dp(8f), 0, dp(3f), 0x33000000);
-        c.drawRoundRect(barRect, r, r, p);
-        p.clearShadowLayer();
+    private void drawBarIdle(Canvas c, float r) {
+        paint.setShader(null);
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(dark ? 0xEE151A20 : 0xEEF2F5F9);
+        paint.setShadowLayer(dp(8f), 0, dp(3f), 0x33000000);
+        c.drawRoundRect(barRect, r, r, paint);
+        paint.clearShadowLayer();
 
-        // 选中格的实心底（不是玻璃）
         float slot = slotWidth();
-        float w = slot - dp(12f);
-        float h = barRect.height() - dp(14f);
+        float w = slot - dp(12f), h = barRect.height() - dp(14f);
         RectF sel = new RectF(lensCenterX - w / 2f, barRect.centerY() - h / 2f,
                 lensCenterX + w / 2f, barRect.centerY() + h / 2f);
-        p.setColor(dark ? 0x1FFFFFFF : 0x12000000);
-        c.drawRoundRect(sel, h / 2f, h / 2f, p);
+        paint.setColor(dark ? 0x1FFFFFFF : 0x12000000);
+        c.drawRoundRect(sel, h / 2f, h / 2f, paint);
 
-        stroke.setColor(dark ? 0x1AFFFFFF : 0x1A000000);
-        c.drawRoundRect(barRect, r, r, stroke);
+        paint.setStyle(Paint.Style.STROKE);
+        paint.setStrokeWidth(dp(1f));
+        paint.setColor(dark ? 0x1AFFFFFF : 0x1A000000);
+        c.drawRoundRect(barRect, r, r, paint);
+        paint.setStyle(Paint.Style.FILL);
     }
 
-    /** 交互态：液态玻璃 */
-    private void drawActive(Canvas c, float r) {
-        // 外阴影
-        p.setShader(null);
-        p.setStyle(Paint.Style.FILL);
-        p.setColor(0x00000000);
-        p.setShadowLayer(dp(16f), 0, dp(7f), 0x77000000);
-        c.drawRoundRect(barRect, r, r, p);
-        p.clearShadowLayer();
+    private void drawBarActive(Canvas c, float r) {
+        int base = dark ? 0xCC101418 : 0xCCE9EEF4;
+        paint.setShader(null);
+        paint.setColor(base);
+        c.drawRoundRect(barRect, r, r, paint);
 
-        boolean hasBg = backdrop != null;
-        // 玻璃本体：有壁纸时先用模糊壁纸打底，再叠色
-        p.setColor(withAlpha(tintColor, hasBg ? 0x99 : 0xE6));
-        c.drawRoundRect(barRect, r, r, p);
-        if (hasBg) {
-            c.save();
-            Path bgClip = new Path();
-            bgClip.addRoundRect(barRect, r, r, Path.Direction.CW);
-            c.clipPath(bgClip);
-            Rect srcAll = new Rect(0, 0, backdrop.getWidth(), backdrop.getHeight());
-            RectF dstAll = new RectF(0, 0, rootW, rootH);
-            p.setAlpha(0x99);
-            c.drawBitmap(backdrop, srcAll, dstAll, p);
-            p.setAlpha(255);
-            c.restore();
-        }
+        paint.setShader(new LinearGradient(0, barRect.top, 0, barRect.bottom,
+                new int[]{0x22FFFFFF, 0x0CFFFFFF}, null, Shader.TileMode.CLAMP));
+        c.drawRoundRect(barRect, r, r, paint);
+        paint.setShader(null);
 
-        // 白色渐变：没有壁纸时非常克制，避免变成一块灰片
-        int a1 = hasBg ? 0x24 : 0x1F, a2 = hasBg ? 0x10 : 0x0D, a3 = hasBg ? 0x06 : 0x05;
-        p.setShader(new LinearGradient(0, barRect.top, 0, barRect.bottom,
-                new int[]{(a1 << 24) | 0xFFFFFF, (a2 << 24) | 0xFFFFFF, (a3 << 24) | 0xFFFFFF},
-                new float[]{0f, 0.45f, 1f}, Shader.TileMode.CLAMP));
-        c.drawRoundRect(barRect, r, r, p);
-        p.setShader(null);
+        paint.setStyle(Paint.Style.STROKE);
+        paint.setStrokeWidth(dp(1f));
+        paint.setColor(dark ? 0x33FFFFFF : 0x22000000);
+        c.drawRoundRect(barRect, r, r, paint);
+        paint.setStyle(Paint.Style.FILL);
+    }
 
-        // 顶部高光 + 底部内阴影
-        c.save();
-        Path clip = new Path();
-        clip.addRoundRect(barRect, r, r, Path.Direction.CW);
-        c.clipPath(clip);
-        p.setShader(new LinearGradient(0, barRect.top, 0, barRect.top + dp(22f),
-                0x99FFFFFF, 0x00FFFFFF, Shader.TileMode.CLAMP));
-        c.drawRect(barRect.left, barRect.top, barRect.right, barRect.top + dp(22f), p);
-        p.setShader(new LinearGradient(0, barRect.bottom - dp(18f), 0, barRect.bottom,
-                0x00000000, 0x4D000000, Shader.TileMode.CLAMP));
-        c.drawRect(barRect.left, barRect.bottom - dp(18f), barRect.right, barRect.bottom, p);
-        p.setShader(null);
-        c.restore();
-
-        // 边缘：上亮下暗
-        stroke.setStrokeWidth(dp(1.2f));
-        stroke.setShader(new LinearGradient(0, barRect.top, 0, barRect.bottom,
-                0x80FFFFFF, 0x22FFFFFF, Shader.TileMode.CLAMP));
-        c.drawRoundRect(barRect, r, r, stroke);
-        stroke.setShader(null);
-
-        // 透镜
-        float slot = slotWidth();
-        // 透镜只包住「图标 + 文字」，不要整条高度
-        float lensW = Math.min(slot - dp(14f), dp(76f));
-        float lensH = dp(46f);
-        float drawW = lensW * (1f + deform * 0.30f);
-        float drawH = lensH * (1f - deform * 0.26f);
+    /** 圆形玻璃气泡：折射 + 亮边 + 椭圆形变 */
+    private void drawBubble(Canvas c) {
+        float baseSize = barRect.height() * 1.35f;
+        float sx = 1f + deform * 0.30f;
+        float sy = 1f - deform * 0.22f;
+        float rx = baseSize / 2f * sx;
+        float ry = baseSize / 2f * sy;
         float cx = lensCenterX;
-        lensRect.set(cx - drawW / 2f, barRect.centerY() - drawH / 2f,
-                cx + drawW / 2f, barRect.centerY() + drawH / 2f);
-        float lr = drawH / 2f;
+        float cy = barRect.centerY();
 
-        // 透镜里的折射：把壁纸对应区域放大 1.18 倍画进透镜
-        c.save();
-        Path lensClip = new Path();
-        lensClip.addRoundRect(lensRect, lr, lr, Path.Direction.CW);
-        c.clipPath(lensClip);
-        if (backdrop != null) {
-            float scale = 1.26f;
-            float bw = drawW / rootW * backdrop.getWidth() * scale;
-            float bh = drawH / rootH * backdrop.getHeight() * scale;
-            float bcx = (cx / rootW) * backdrop.getWidth();
-            float bcy = (barRect.centerY() / rootH) * backdrop.getHeight();
-            Rect src = new Rect((int) (bcx - bw / 2f), (int) (bcy - bh / 2f),
-                    (int) (bcx + bw / 2f), (int) (bcy + bh / 2f));
-            p.setAlpha(0xE6);
-            c.drawBitmap(backdrop, src, lensRect, p);
-            p.setAlpha(255);
+        bubbleRect.set(cx - rx, cy - ry, cx + rx, cy + ry);
+
+        int alpha = (int) (255 * bubbleAlpha);
+
+        // 1) 折射内容
+        if (!drawRefraction(c, cx, cy, rx, ry, alpha)) {
+            drawMagnifiedBackdrop(c, cx, cy, rx, ry, alpha);
         }
-        // 透镜玻璃色：有壁纸偏亮，没壁纸偏深
-        int g1 = backdrop != null ? 0x14FFFFFF : 0x24FFFFFF;
-        int g2 = backdrop != null ? 0x06FFFFFF : 0x0AFFFFFF;
-        p.setShader(new LinearGradient(0, lensRect.top, 0, lensRect.bottom,
-                g1, g2, Shader.TileMode.CLAMP));
-        c.drawRoundRect(lensRect, lr, lr, p);
-        p.setShader(null);
-        // 顶部弧形高光
-        p.setShader(new LinearGradient(0, lensRect.top, 0, lensRect.top + drawH * 0.5f,
-                0x33FFFFFF, 0x00FFFFFF, Shader.TileMode.CLAMP));
-        c.drawRoundRect(new RectF(lensRect.left + dp(2f), lensRect.top + dp(2f),
-                lensRect.right - dp(2f), lensRect.top + drawH * 0.5f), lr, lr, p);
-        p.setShader(null);
-        c.restore();
 
-        stroke.setStrokeWidth(dp(1.1f));
-        stroke.setColor(0x66FFFFFF);
-        c.drawRoundRect(lensRect, lr, lr, stroke);
-        stroke.setColor(0x33FFFFFF);
+        // 2) 玻璃色 + 顶部高光
+        paint.setShader(new LinearGradient(0, bubbleRect.top, 0, bubbleRect.bottom,
+                (int) (0x33 * bubbleAlpha / 1f) << 24 | 0xFFFFFF,
+                (int) (0x0A * bubbleAlpha / 1f) << 24 | 0xFFFFFF,
+                Shader.TileMode.CLAMP));
+        c.drawOval(bubbleRect, paint);
+        paint.setShader(null);
+
+        // 3) 亮边
+        paint.setStyle(Paint.Style.STROKE);
+        paint.setStrokeWidth(dp(1.6f));
+        paint.setShader(new LinearGradient(0, bubbleRect.top, 0, bubbleRect.bottom,
+                (int) (0xBB * bubbleAlpha) << 24 | 0xFFFFFF,
+                (int) (0x33 * bubbleAlpha) << 24 | 0xFFFFFF,
+                Shader.TileMode.CLAMP));
+        c.drawOval(bubbleRect, paint);
+        paint.setShader(null);
+        paint.setStyle(Paint.Style.FILL);
     }
 
-    /** 图标 + 文字；透镜扫过谁，谁就形变（跟位置无关，跟距离有关） */
+    /** 用 AGSL 做真实折射（API 33+），失败返回 false 走降级 */
+    private boolean drawRefraction(Canvas c, float cx, float cy, float rx, float ry, int alpha) {
+        if (Build.VERSION.SDK_INT < 33 || shaderBroken) return false;
+        if (selfTexture == null || selfTexture.isRecycled()) return false;
+        try {
+            Shader shader = buildAgsShader(cx, cy, Math.min(rx, ry));
+            if (shader == null) return false;
+            paint.setShader(shader);
+            paint.setAlpha(alpha);
+            c.drawOval(bubbleRect, paint);
+            paint.setAlpha(255);
+            paint.setShader(null);
+            return true;
+        } catch (Throwable t) {
+            shaderBroken = true;
+            paint.setShader(null);
+            return false;
+        }
+    }
+
+    @SuppressWarnings({"NewApi", "unchecked"})
+    private Shader buildAgsShader(float cx, float cy, float radius) throws Exception {
+        Class<?> cls = Class.forName("android.graphics.RuntimeShader");
+        Object rs = cls.getConstructor(String.class).newInstance(LENS_AGSL);
+        Class<?> shaderCls = Class.forName("android.graphics.Shader");
+        java.lang.reflect.Method setInput = cls.getMethod("setInputShader",
+                String.class, shaderCls);
+        BitmapShader bs = new BitmapShader(selfTexture, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP);
+        setInput.invoke(rs, "content", bs);
+        cls.getMethod("setFloatUniform", String.class, float[].class)
+                .invoke(rs, "center", new float[]{cx, cy});
+        cls.getMethod("setFloatUniform", String.class, float.class)
+                .invoke(rs, "radius", radius);
+        cls.getMethod("setFloatUniform", String.class, float.class)
+                .invoke(rs, "strength", radius * 0.42f);
+        runtimeShader = rs;
+        return (Shader) rs;
+    }
+
+    /** 降级：把壁纸/快照放大 1.34 倍画进气泡 */
+    private void drawMagnifiedBackdrop(Canvas c, float cx, float cy, float rx, float ry, int alpha) {
+        Bitmap src = selfTexture != null ? selfTexture : backdrop;
+        if (src == null) return;
+        float k = 1.34f;
+        Rect dst = new Rect((int) (cx - rx), (int) (cy - ry), (int) (cx + rx), (int) (cy + ry));
+        Rect out = new Rect();
+        int w = (int) (rx * 2 / k), h = (int) (ry * 2 / k);
+        out.set((int) cx - w / 2, (int) cy - h / 2, (int) cx + w / 2, (int) cy + h / 2);
+        paint.setShader(null);
+        paint.setAlpha(alpha);
+        c.drawBitmap(src, Region(out), dst, paint);
+        paint.setAlpha(255);
+    }
+
+    /** 抓一份任务栏快照，作为折射的采样源 */
+    private void captureSelf() {
+        try {
+            int w = getWidth(), h = getHeight();
+            if (w <= 0 || h <= 0) return;
+            Bitmap bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
+            Canvas cv = new Canvas(bmp);
+            drawBarIdle(cv, barRect.height() / 2f);
+            drawItems(cv);
+            selfTexture = bmp;
+        } catch (Throwable ignored) {
+        }
+    }
+
     private void drawItems(Canvas c) {
         float slot = slotWidth();
         for (int i = 0; i < LABELS.length; i++) {
             float ccx = barRect.left + slot * (i + 0.5f);
             boolean on = i == selected;
-            int color = on ? ACCENT : (active || dark ? 0xEEFFFFFF : 0xCC111820);
+            int color = on ? ACCENT : (dark ? 0xEEFFFFFF : 0xCC111820);
             iconPaint.setColor(color);
             labelPaint.setColor(color);
 
-            // 距离透镜越近，形变越强；但只让「图标」形变，文字保持清晰
-            float dist = Math.abs(ccx - lensCenterX);
-            float falloff = Math.max(0f, 1f - dist / (slot * 0.85f));
-            float amt = active ? deform * falloff : 0f;
             float boost = (on ? 0.06f : 0f) + (i == pressedIndex ? pressBoost * 0.10f : 0f);
-
-            // 图标：放大 + 随透镜压扁
-            float isx = 1f + boost + amt * 0.24f;
-            float isy = 1f + boost - amt * 0.18f;
+            float isx = 1f + boost;
+            float isy = 1f + boost;
             c.save();
             c.scale(isx, isy, ccx, barRect.centerY() - dp(6f));
             drawIcon(c, i, ccx, barRect.centerY() - dp(6f), dp(8.5f));
             c.restore();
 
-            // 文字：只轻微放大，不参与压扁，保证可读
-            float ts = 1f + boost * 0.5f;
             c.save();
-            c.scale(ts, ts, ccx, barRect.centerY() + dp(17f));
+            c.scale(1f + boost * 0.5f, 1f + boost * 0.5f, ccx, barRect.centerY() + dp(17f));
             c.drawText(LABELS[i], ccx, barRect.centerY() + dp(17f), labelPaint);
             c.restore();
         }
@@ -354,44 +365,41 @@ public class GlassBottomBar extends View {
         if (index == 3) c.drawCircle(cx, cy - s * 0.5f, dp(1.6f), iconPaint);
     }
 
-    private static int withAlpha(int color, int alpha) {
-        return (color & 0x00FFFFFF) | (alpha << 24);
-    }
-
     // ---------------- 交互 ----------------
 
     @Override
     public boolean onTouchEvent(MotionEvent e) {
         switch (e.getActionMasked()) {
-            case MotionEvent.ACTION_DOWN:
+            case MotionEvent.ACTION_DOWN: {
                 if (anim != null) anim.cancel();
-                setActive(true);
                 pressedIndex = (int) ((e.getX() - barRect.left) / slotWidth());
                 pressedIndex = Math.max(0, Math.min(LABELS.length - 1, pressedIndex));
-                animatePress(1f, 110);
                 dragging = true;
                 downX = e.getX();
                 lastX = downX;
                 lastT = System.currentTimeMillis();
                 dragStartCenter = lensCenterX;
+                captureSelf();
+                showBubble();
+                animatePress(1f, 110);
+                try { performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP); } catch (Throwable ignored) {}
                 return true;
+            }
             case MotionEvent.ACTION_MOVE: {
                 if (!dragging) return true;
                 long now = System.currentTimeMillis();
                 float dt = Math.max(1f, now - lastT);
-                float v = Math.abs(e.getX() - lastX) / dt; // px per ms
+                float v = Math.abs(e.getX() - lastX) / dt;
                 lastX = e.getX();
                 lastT = now;
-                // 速度驱动形变：快 → 压扁；慢 → 回落
-                deform = Math.min(0.9f, deform * 0.55f + v * 0.55f);
-                lastX = e.getX();
+                deform = Math.min(0.9f, deform * 0.5f + v * 0.7f);
 
                 float slot = slotWidth();
                 float minC = barRect.left + slot / 2f;
                 float maxC = barRect.right - slot / 2f;
                 lensCenterX = Math.max(minC, Math.min(maxC, dragStartCenter + (e.getX() - downX)));
                 removeCallbacks(decay);
-                postDelayed(decay, 48);
+                postDelayed(decay, 40);
                 invalidate();
                 return true;
             }
@@ -400,8 +408,7 @@ public class GlassBottomBar extends View {
                 if (!dragging) return true;
                 dragging = false;
                 float moved = Math.abs(e.getX() - downX);
-                boolean tap = e.getActionMasked() == MotionEvent.ACTION_UP
-                        && moved < density * 8f;
+                boolean tap = e.getActionMasked() == MotionEvent.ACTION_UP && moved < density * 8f;
                 int target;
                 if (tap) {
                     target = (int) ((e.getX() - barRect.left) / slotWidth());
@@ -413,16 +420,44 @@ public class GlassBottomBar extends View {
                 animatePress(0f, 180);
                 pressedIndex = -1;
                 removeCallbacks(decay);
-                postDelayed(decay, 120);
-                postDelayed(new Runnable() {
-                    @Override public void run() {
-                        if (!dragging) setActive(false);
-                    }
-                }, 520);
+                postDelayed(decay, 80);
+                hideBubble(520);
                 return true;
             }
         }
         return true;
+    }
+
+    private void showBubble() {
+        if (alphaAnim != null) alphaAnim.cancel();
+        alphaAnim = ValueAnimator.ofFloat(bubbleAlpha, 1f);
+        alphaAnim.setDuration(160);
+        alphaAnim.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() {
+            @Override public void onAnimationUpdate(ValueAnimator v) {
+                bubbleAlpha = (float) v.getAnimatedValue();
+                active = bubbleAlpha > 0.01f;
+                invalidate();
+            }
+        });
+        alphaAnim.start();
+    }
+
+    private void hideBubble(long delay) {
+        postDelayed(new Runnable() {
+            @Override public void run() {
+                if (alphaAnim != null) alphaAnim.cancel();
+                alphaAnim = ValueAnimator.ofFloat(bubbleAlpha, 0f);
+                alphaAnim.setDuration(220);
+                alphaAnim.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() {
+                    @Override public void onAnimationUpdate(ValueAnimator v) {
+                        bubbleAlpha = (float) v.getAnimatedValue();
+                        active = bubbleAlpha > 0.01f;
+                        invalidate();
+                    }
+                });
+                alphaAnim.start();
+            }
+        }, delay);
     }
 
     private void animatePress(final float to, int duration) {
@@ -438,12 +473,6 @@ public class GlassBottomBar extends View {
         pressAnim.start();
     }
 
-    private void setActive(boolean on) {
-        if (active == on) return;
-        active = on;
-        invalidate();
-    }
-
     private int nearestIndex(float cx) {
         int i = Math.round((cx - barRect.left) / slotWidth() - 0.5f);
         return Math.max(0, Math.min(LABELS.length - 1, i));
@@ -455,7 +484,7 @@ public class GlassBottomBar extends View {
         selected = index;
         if (anim != null) anim.cancel();
         anim = ValueAnimator.ofFloat(0f, 1f);
-        anim.setDuration(320);
+        anim.setDuration(300);
         anim.setInterpolator(new DecelerateInterpolator(1.8f));
         anim.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() {
             @Override public void onAnimationUpdate(ValueAnimator v) {
@@ -466,5 +495,10 @@ public class GlassBottomBar extends View {
         });
         anim.start();
         if (notify && listener != null) listener.onTabSelected(index);
+    }
+
+    /** 简易矩形区域（避免引入 android.graphics.Region 名冲突） */
+    private static class Region extends android.graphics.Rect {
+        Region(Rect r) { super(r); }
     }
 }
