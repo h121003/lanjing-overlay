@@ -32,7 +32,7 @@ public class GlassBottomBar extends View {
     private static final float BAR_H_DP = 56f;
     private static final float MARGIN_X_DP = 18f;
     private static final float MARGIN_BOTTOM_DP = 10f;
-    private static final float MAGNIFY = 1.26f;
+    private static final float MAGNIFY = 1.18f;
 
     /** 折射 + 色散：中心放大，边缘把 RGB 三个通道往不同方向偏 */
     private static final String AGSL =
