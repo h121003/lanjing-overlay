@@ -95,12 +95,12 @@ public class MainActivity extends Activity {
 
         bar = new GlassBottomBar(this);
         bar.setDark(dark);
-        bar.setTint(dark ? 0xFF22262C : 0xFFE7ECF2);
         bar.setOnTabSelected(new GlassBottomBar.OnTabSelected() {
             @Override public void onTabSelected(int index) { show(index); }
         });
+        // 给气泡留出溢出空间（气泡会超出栏体上下）
         column.addView(bar, new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, dp(76)));
+                LinearLayout.LayoutParams.MATCH_PARENT, dp(120)));
 
         setContentView(root);
         applyInsets(root);
@@ -339,7 +339,6 @@ public class MainActivity extends Activity {
                         @Override public void run() {
                             if (bar == null) return;
                             bar.setTint(color);
-                            bar.setBackdrop(thumb, rootView.getWidth(), rootView.getHeight());
                         }
                     });
                 } catch (Exception ignored) {

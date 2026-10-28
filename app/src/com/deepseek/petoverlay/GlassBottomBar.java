@@ -2,17 +2,12 @@ package com.deepseek.petoverlay;
 
 import android.animation.ValueAnimator;
 import android.content.Context;
-import android.graphics.Bitmap;
-import android.graphics.BitmapShader;
 import android.graphics.Canvas;
 import android.graphics.LinearGradient;
 import android.graphics.Paint;
 import android.graphics.Path;
-import android.graphics.RadialGradient;
-import android.graphics.Rect;
 import android.graphics.RectF;
 import android.graphics.Shader;
-import android.os.Build;
 import android.util.AttributeSet;
 import android.view.HapticFeedbackConstants;
 import android.view.MotionEvent;
@@ -22,9 +17,9 @@ import android.view.animation.DecelerateInterpolator;
 /**
  * 底部导航栏 + 液态玻璃气泡。
  *
- * 交互时从选中项升起一个圆形玻璃气泡（直径 ≈ 栏高 × 1.35，允许超出栏体），
- * 气泡内对「任务栏自身的截屏」做折射扭曲（Android 13+ 用 AGSL 片元着色器，
- * 低版本降级为放大采样），移动时横向拉成椭圆，松手回圆并淡出。
+ * 交互时升起一个圆形玻璃气泡（直径 ≈ 栏高 × 1.35，允许上下超出栏体），
+ * 气泡里把「任务栏自身」放大 1.35 倍重绘一遍 → 放大镜式折射观感，
+ * 比采样纹理干净，也不依赖 AGSL。移动时横向拉成椭圆，松手回圆并淡出。
  */
 public class GlassBottomBar extends View {
 
@@ -34,53 +29,33 @@ public class GlassBottomBar extends View {
 
     private static final String[] LABELS = {"宠物", "外观", "设置", "关于"};
     private static final int ACCENT = 0xFF11A34C;
-
-    /** 气泡内壁的折射：中心不动，靠近边缘处把背景往中心「吸」 */
-    private static final String LENS_AGSL =
-            "uniform shader content;\n" +
-            "uniform float2 center;\n" +
-            "uniform float radius;\n" +
-            "uniform float strength;\n" +
-            "half4 main(float2 p) {\n" +
-            "  float2 d = p - center;\n" +
-            "  float dist = length(d);\n" +
-            "  if (dist < 0.001 || dist > radius) { return content.eval(p); }\n" +
-            "  float t = 1.0 - dist / radius;\n" +
-            "  float2 dir = d / dist;\n" +
-            "  float2 offset = dir * (t * t) * strength;\n" +
-            "  return content.eval(p - offset);\n" +
-            "}\n";
+    private static final float BAR_H_DP = 56f;
+    private static final float MARGIN_X_DP = 18f;
+    private static final float MARGIN_BOTTOM_DP = 10f;
+    private static final float MAGNIFY = 1.35f;
 
     private final float density;
     private final RectF barRect = new RectF();
     private final RectF bubbleRect = new RectF();
     private final Path iconPath = new Path();
+    private final Path bubblePath = new Path();
     private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint iconPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint labelPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
 
     private int selected = 0;
-    private int tintColor = 0xFF22262C;
     private boolean dark = true;
-    private boolean active = false;
-
     private float lensCenterX = -1f;
-    private float deform = 0f;      // 0..1，速度驱动
-    private float bubbleAlpha = 0f; // 0..1，淡入淡出
+    private float deform = 0f;
+    private float bubbleAlpha = 0f;
     private float pressBoost = 0f;
-
-    private Bitmap backdrop;        // 壁纸缩略图
-    private int rootW = 1, rootH = 1;
-
-    private Bitmap selfTexture;     // 任务栏自身快照，供折射采样
-    private Object runtimeShader;   // android.graphics.RuntimeShader（反射持有）
-    private boolean shaderBroken = false;
 
     private boolean dragging = false;
     private int pressedIndex = -1;
     private float downX = 0f, dragStartCenter = 0f, lastX = 0f;
     private long lastT = 0L;
     private ValueAnimator anim, alphaAnim, pressAnim;
+    private OnTabSelected listener;
 
     private final Runnable decay = new Runnable() {
         @Override public void run() {
@@ -95,7 +70,6 @@ public class GlassBottomBar extends View {
     public GlassBottomBar(Context c, AttributeSet a) {
         super(c, a);
         density = getResources().getDisplayMetrics().density;
-        setLayerType(LAYER_TYPE_SOFTWARE, null);
         iconPaint.setStyle(Paint.Style.STROKE);
         iconPaint.setStrokeWidth(dp(1.8f));
         iconPaint.setStrokeCap(Paint.Cap.ROUND);
@@ -104,24 +78,13 @@ public class GlassBottomBar extends View {
     }
 
     public void setOnTabSelected(OnTabSelected l) { listener = l; }
-    private OnTabSelected listener;
-
     public int getSelected() { return selected; }
+    public void setDark(boolean d) { dark = d; invalidate(); }
+    public void setTint(int color) { invalidate(); }
 
     public void setSelectedSilently(int i) {
         selected = Math.max(0, Math.min(LABELS.length - 1, i));
         lensCenterX = centerOf(selected);
-        invalidate();
-    }
-
-    public void setDark(boolean d) { dark = d; invalidate(); }
-
-    public void setTint(int color) { tintColor = color; invalidate(); }
-
-    public void setBackdrop(Bitmap bmp, int w, int h) {
-        backdrop = bmp;
-        rootW = Math.max(1, w);
-        rootH = Math.max(1, h);
         invalidate();
     }
 
@@ -131,7 +94,9 @@ public class GlassBottomBar extends View {
 
     @Override
     protected void onSizeChanged(int w, int h, int ow, int oh) {
-        barRect.set(dp(18f), dp(10f), w - dp(18f), h - dp(10f));
+        float barH = dp(BAR_H_DP);
+        barRect.set(dp(MARGIN_X_DP), h - dp(MARGIN_BOTTOM_DP) - barH,
+                w - dp(MARGIN_X_DP), h - dp(MARGIN_BOTTOM_DP));
         if (lensCenterX < 0) lensCenterX = centerOf(selected);
     }
 
@@ -142,7 +107,6 @@ public class GlassBottomBar extends View {
         super.onDraw(c);
         float r = barRect.height() / 2f;
 
-        // 整条栏微动（幅度很小）
         float center = (barRect.left + barRect.right) / 2f;
         float shift = (lensCenterX - center) * 0.02f;
         float max = dp(4f);
@@ -150,18 +114,13 @@ public class GlassBottomBar extends View {
 
         c.save();
         c.translate(shift, 0f);
-
-        if (!active || bubbleAlpha < 0.02f) {
-            drawBarIdle(c, r);
-        } else {
-            drawBarActive(c, r);
-            drawBubble(c);
-        }
+        drawBar(c, r);
         drawItems(c);
+        if (bubbleAlpha > 0.01f) drawBubble(c);
         c.restore();
     }
 
-    private void drawBarIdle(Canvas c, float r) {
+    private void drawBar(Canvas c, float r) {
         paint.setShader(null);
         paint.setStyle(Paint.Style.FILL);
         paint.setColor(dark ? 0xEE151A20 : 0xEEF2F5F9);
@@ -169,12 +128,14 @@ public class GlassBottomBar extends View {
         c.drawRoundRect(barRect, r, r, paint);
         paint.clearShadowLayer();
 
-        float slot = slotWidth();
-        float w = slot - dp(12f), h = barRect.height() - dp(14f);
-        RectF sel = new RectF(lensCenterX - w / 2f, barRect.centerY() - h / 2f,
-                lensCenterX + w / 2f, barRect.centerY() + h / 2f);
-        paint.setColor(dark ? 0x1FFFFFFF : 0x12000000);
-        c.drawRoundRect(sel, h / 2f, h / 2f, paint);
+        if (bubbleAlpha < 0.01f) {
+            float slot = slotWidth();
+            float w = slot - dp(12f), h = barRect.height() - dp(14f);
+            RectF sel = new RectF(lensCenterX - w / 2f, barRect.centerY() - h / 2f,
+                    lensCenterX + w / 2f, barRect.centerY() + h / 2f);
+            paint.setColor(dark ? 0x1FFFFFFF : 0x12000000);
+            c.drawRoundRect(sel, h / 2f, h / 2f, paint);
+        }
 
         paint.setStyle(Paint.Style.STROKE);
         paint.setStrokeWidth(dp(1f));
@@ -183,135 +144,47 @@ public class GlassBottomBar extends View {
         paint.setStyle(Paint.Style.FILL);
     }
 
-    private void drawBarActive(Canvas c, float r) {
-        int base = dark ? 0xCC101418 : 0xCCE9EEF4;
-        paint.setShader(null);
-        paint.setColor(base);
-        c.drawRoundRect(barRect, r, r, paint);
-
-        paint.setShader(new LinearGradient(0, barRect.top, 0, barRect.bottom,
-                new int[]{0x22FFFFFF, 0x0CFFFFFF}, null, Shader.TileMode.CLAMP));
-        c.drawRoundRect(barRect, r, r, paint);
-        paint.setShader(null);
-
-        paint.setStyle(Paint.Style.STROKE);
-        paint.setStrokeWidth(dp(1f));
-        paint.setColor(dark ? 0x33FFFFFF : 0x22000000);
-        c.drawRoundRect(barRect, r, r, paint);
-        paint.setStyle(Paint.Style.FILL);
-    }
-
-    /** 圆形玻璃气泡：折射 + 亮边 + 椭圆形变 */
+    /** 圆形玻璃气泡：放大重绘栏内容 → 叠玻璃色 → 画亮边 */
     private void drawBubble(Canvas c) {
-        float baseSize = barRect.height() * 1.35f;
-        float sx = 1f + deform * 0.30f;
-        float sy = 1f - deform * 0.22f;
-        float rx = baseSize / 2f * sx;
-        float ry = baseSize / 2f * sy;
+        float base = barRect.height() * 1.35f;
+        float sx = 1f + deform * 0.34f;
+        float sy = 1f - deform * 0.24f;
+        float rx = base / 2f * sx;
+        float ry = base / 2f * sy;
         float cx = lensCenterX;
         float cy = barRect.centerY();
-
         bubbleRect.set(cx - rx, cy - ry, cx + rx, cy + ry);
 
-        int alpha = (int) (255 * bubbleAlpha);
+        bubblePath.reset();
+        bubblePath.addOval(bubbleRect, Path.Direction.CW);
 
-        // 1) 折射内容
-        if (!drawRefraction(c, cx, cy, rx, ry, alpha)) {
-            drawMagnifiedBackdrop(c, cx, cy, rx, ry, alpha);
-        }
+        // 1) 放大重绘
+        c.save();
+        c.clipPath(bubblePath);
+        c.scale(MAGNIFY, MAGNIFY, cx, cy);
+        drawBar(c, barRect.height() / 2f);
+        drawItems(c);
+        c.restore();
 
-        // 2) 玻璃色 + 顶部高光
+        // 2) 玻璃色
         paint.setShader(new LinearGradient(0, bubbleRect.top, 0, bubbleRect.bottom,
-                (int) (0x33 * bubbleAlpha / 1f) << 24 | 0xFFFFFF,
-                (int) (0x0A * bubbleAlpha / 1f) << 24 | 0xFFFFFF,
+                ((int) (0x26 * bubbleAlpha) << 24) | 0xFFFFFF,
+                ((int) (0x08 * bubbleAlpha) << 24) | 0xFFFFFF,
                 Shader.TileMode.CLAMP));
-        c.drawOval(bubbleRect, paint);
+        c.drawPath(bubblePath, paint);
         paint.setShader(null);
 
         // 3) 亮边
         paint.setStyle(Paint.Style.STROKE);
         paint.setStrokeWidth(dp(1.6f));
         paint.setShader(new LinearGradient(0, bubbleRect.top, 0, bubbleRect.bottom,
-                (int) (0xBB * bubbleAlpha) << 24 | 0xFFFFFF,
-                (int) (0x33 * bubbleAlpha) << 24 | 0xFFFFFF,
+                ((int) (0xC0 * bubbleAlpha) << 24) | 0xFFFFFF,
+                ((int) (0x30 * bubbleAlpha) << 24) | 0xFFFFFF,
                 Shader.TileMode.CLAMP));
-        c.drawOval(bubbleRect, paint);
+        c.drawPath(bubblePath, paint);
         paint.setShader(null);
         paint.setStyle(Paint.Style.FILL);
-    }
-
-    /** 用 AGSL 做真实折射（API 33+），失败返回 false 走降级 */
-    private boolean drawRefraction(Canvas c, float cx, float cy, float rx, float ry, int alpha) {
-        if (Build.VERSION.SDK_INT < 33 || shaderBroken) return false;
-        if (selfTexture == null || selfTexture.isRecycled()) return false;
-        try {
-            Shader shader = buildAgsShader(cx, cy, Math.min(rx, ry));
-            if (shader == null) return false;
-            paint.setShader(shader);
-            paint.setAlpha(alpha);
-            c.drawOval(bubbleRect, paint);
-            paint.setAlpha(255);
-            paint.setShader(null);
-            return true;
-        } catch (Throwable t) {
-            shaderBroken = true;
-            paint.setShader(null);
-            return false;
-        }
-    }
-
-    @SuppressWarnings({"NewApi", "unchecked"})
-    private Shader buildAgsShader(float cx, float cy, float radius) throws Exception {
-        Class<?> cls = Class.forName("android.graphics.RuntimeShader");
-        Object rs = cls.getConstructor(String.class).newInstance(LENS_AGSL);
-        Class<?> shaderCls = Class.forName("android.graphics.Shader");
-        java.lang.reflect.Method setInput = cls.getMethod("setInputShader",
-                String.class, shaderCls);
-        BitmapShader bs = new BitmapShader(selfTexture, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP);
-        setInput.invoke(rs, "content", bs);
-        cls.getMethod("setFloatUniform", String.class, float[].class)
-                .invoke(rs, "center", new float[]{cx, cy});
-        cls.getMethod("setFloatUniform", String.class, float.class)
-                .invoke(rs, "radius", radius);
-        cls.getMethod("setFloatUniform", String.class, float.class)
-                .invoke(rs, "strength", radius * 0.42f);
-        runtimeShader = rs;
-        return (Shader) rs;
-    }
-
-    /** 降级：把壁纸/快照放大 1.34 倍画进气泡 */
-    private void drawMagnifiedBackdrop(Canvas c, float cx, float cy, float rx, float ry, int alpha) {
-        Bitmap src = selfTexture != null ? selfTexture : backdrop;
-        if (src == null) return;
-        float k = 1.34f;
-        Rect dst = new Rect((int) (cx - rx), (int) (cy - ry), (int) (cx + rx), (int) (cy + ry));
-        Rect out = new Rect();
-        int w = (int) (rx * 2 / k), h = (int) (ry * 2 / k);
-        out.set((int) cx - w / 2, (int) cy - h / 2, (int) cx + w / 2, (int) cy + h / 2);
-        // 限制在原图范围内，避免越界采样
-        if (out.left < 0) out.left = 0;
-        if (out.top < 0) out.top = 0;
-        if (out.right > src.getWidth()) out.right = src.getWidth();
-        if (out.bottom > src.getHeight()) out.bottom = src.getHeight();
-        if (out.width() <= 0 || out.height() <= 0) return;
-        paint.setShader(null);
-        paint.setAlpha(alpha);
-        c.drawBitmap(src, out, dst, paint);
         paint.setAlpha(255);
-    }
-
-    /** 抓一份任务栏快照，作为折射的采样源 */
-    private void captureSelf() {
-        try {
-            int w = getWidth(), h = getHeight();
-            if (w <= 0 || h <= 0) return;
-            Bitmap bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
-            Canvas cv = new Canvas(bmp);
-            drawBarIdle(cv, barRect.height() / 2f);
-            drawItems(cv);
-            selfTexture = bmp;
-        } catch (Throwable ignored) {
-        }
     }
 
     private void drawItems(Canvas c) {
@@ -324,10 +197,8 @@ public class GlassBottomBar extends View {
             labelPaint.setColor(color);
 
             float boost = (on ? 0.06f : 0f) + (i == pressedIndex ? pressBoost * 0.10f : 0f);
-            float isx = 1f + boost;
-            float isy = 1f + boost;
             c.save();
-            c.scale(isx, isy, ccx, barRect.centerY() - dp(6f));
+            c.scale(1f + boost, 1f + boost, ccx, barRect.centerY() - dp(6f));
             drawIcon(c, i, ccx, barRect.centerY() - dp(6f), dp(8.5f));
             c.restore();
 
@@ -386,7 +257,6 @@ public class GlassBottomBar extends View {
                 lastX = downX;
                 lastT = System.currentTimeMillis();
                 dragStartCenter = lensCenterX;
-                captureSelf();
                 showBubble();
                 animatePress(1f, 110);
                 try { performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP); } catch (Throwable ignored) {}
@@ -442,7 +312,6 @@ public class GlassBottomBar extends View {
         alphaAnim.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() {
             @Override public void onAnimationUpdate(ValueAnimator v) {
                 bubbleAlpha = (float) v.getAnimatedValue();
-                active = bubbleAlpha > 0.01f;
                 invalidate();
             }
         });
@@ -458,7 +327,6 @@ public class GlassBottomBar extends View {
                 alphaAnim.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() {
                     @Override public void onAnimationUpdate(ValueAnimator v) {
                         bubbleAlpha = (float) v.getAnimatedValue();
-                        active = bubbleAlpha > 0.01f;
                         invalidate();
                     }
                 });
