@@ -182,33 +182,67 @@ public class GlassBottomBar extends View {
         if (index == 3) c.drawCircle(cx, cy - s * 0.5f, dp(1.6f), iconPaint);
     }
 
+    private static final long SNAP_MS = 260;
+    private boolean dragging = false;
+    private float downX = 0f;
+    private float dragStartCenter = 0f;
+    private ValueAnimator anim;
+
     @Override
     public boolean onTouchEvent(MotionEvent e) {
-        if (e.getAction() == MotionEvent.ACTION_UP) {
-            int i = (int) ((e.getX() - barRect.left) / slotWidth());
-            if (i >= 0 && i < LABELS.length && i != selected) select(i);
-            return true;
+        switch (e.getActionMasked()) {
+            case MotionEvent.ACTION_DOWN:
+                if (anim != null) anim.cancel();
+                dragging = true;
+                downX = e.getX();
+                dragStartCenter = lensCenterX;
+                stretch = 0f;
+                return true;
+            case MotionEvent.ACTION_MOVE:
+                if (!dragging) return true;
+                float dx = e.getX() - downX;
+                float slot = slotWidth();
+                float minC = barRect.left + slot / 2f;
+                float maxC = barRect.right - slot / 2f;
+                lensCenterX = Math.max(minC, Math.min(maxC, dragStartCenter + dx));
+                // 拖动时按位移量拉伸，跟手
+                stretch = Math.min(1f, Math.abs(dx) / (slot * 1.4f));
+                invalidate();
+                return true;
+            case MotionEvent.ACTION_UP:
+            case MotionEvent.ACTION_CANCEL:
+                if (!dragging) return true;
+                dragging = false;
+                int target = nearestIndex(lensCenterX);
+                animateTo(target, true);
+                return true;
         }
         return true;
     }
 
-    private void select(final int index) {
+    private int nearestIndex(float cx) {
+        float slot = slotWidth();
+        int i = Math.round((cx - barRect.left) / slot - 0.5f);
+        return Math.max(0, Math.min(LABELS.length - 1, i));
+    }
+
+    private void animateTo(final int index, boolean notify) {
         final float from = lensCenterX;
         final float to = centerOf(index);
         selected = index;
-        ValueAnimator a = ValueAnimator.ofFloat(0f, 1f);
-        a.setDuration(420);
-        a.setInterpolator(new DecelerateInterpolator(1.6f));
-        a.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() {
+        if (anim != null) anim.cancel();
+        anim = ValueAnimator.ofFloat(0f, 1f);
+        anim.setDuration(SNAP_MS);
+        anim.setInterpolator(new DecelerateInterpolator(1.8f));
+        anim.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() {
             @Override public void onAnimationUpdate(ValueAnimator v) {
                 float f = (float) v.getAnimatedValue();
                 lensCenterX = from + (to - from) * f;
-                // 途中拉伸，两端归零：形成「液态」的挤压回弹感
-                stretch = (float) Math.sin(Math.PI * f);
+                stretch = (float) Math.sin(Math.PI * f) * 0.6f;
                 invalidate();
             }
         });
-        a.start();
-        if (listener != null) listener.onTabSelected(index);
+        anim.start();
+        if (notify && listener != null) listener.onTabSelected(index);
     }
 }

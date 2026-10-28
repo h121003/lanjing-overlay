@@ -5,15 +5,18 @@ import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.graphics.BitmapFactory;
+import android.graphics.Color;
 import android.graphics.Typeface;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.provider.Settings;
 import android.view.View;
+import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
@@ -27,28 +30,48 @@ public class MainActivity extends Activity {
     private static final String QQ_GROUP = "1129465403";
     private static final String TELEGRAM = "https://t.me/sbh121003";
     private static final String GITHUB = "https://github.com/h121003/lanjing-overlay";
+    private static final int REQ_WALLPAPER = 2001;
+    private static final String PREFS = "lanjing";
+    private static final String KEY_WALLPAPER = "wallpaper_uri";
 
-    private final LinearLayout[] pages = new LinearLayout[4];
+    private final View[] pages = new View[4];
     private FrameLayout content;
+    private ImageView wallpaper;
     private GlassBottomBar bar;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        LinearLayout root = new LinearLayout(this);
-        root.setOrientation(LinearLayout.VERTICAL);
-        root.setBackgroundColor(0xFF0F1114);
+        FrameLayout root = new FrameLayout(this);
+
+        wallpaper = new ImageView(this);
+        wallpaper.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        wallpaper.setBackgroundColor(0xFF0F1114);
+        root.addView(wallpaper, new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
+        applyWallpaper();
+
+        // 壁纸上的暗色蒙版，保证文字可读
+        View scrim = new View(this);
+        scrim.setBackgroundColor(0xB3000000);
+        root.addView(scrim, new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
+
+        LinearLayout column = new LinearLayout(this);
+        column.setOrientation(LinearLayout.VERTICAL);
+        root.addView(column, new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
 
         content = new FrameLayout(this);
-        root.addView(content, new LinearLayout.LayoutParams(
+        column.addView(content, new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f));
 
         pages[0] = buildPetPage();
         pages[1] = buildLookPage();
         pages[2] = buildSettingsPage();
         pages[3] = buildAboutPage();
-        for (LinearLayout p : pages) {
+        for (View p : pages) {
             content.addView(p, new FrameLayout.LayoutParams(
                     FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
         }
@@ -58,20 +81,19 @@ public class MainActivity extends Activity {
         bar.setOnTabSelected(new GlassBottomBar.OnTabSelected() {
             @Override public void onTabSelected(int index) { show(index); }
         });
-        root.addView(bar, new LinearLayout.LayoutParams(
+        column.addView(bar, new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, dp(84)));
 
         setContentView(root);
         applyInsets(root);
     }
 
-    /** Android 15 强制 edge-to-edge：给根布局补系统栏内边距 */
     private void applyInsets(final View root) {
         if (Build.VERSION.SDK_INT < 30) return;
         root.setOnApplyWindowInsetsListener(new View.OnApplyWindowInsetsListener() {
             @Override public android.view.WindowInsets onApplyWindowInsets(View v, android.view.WindowInsets insets) {
-                android.graphics.Insets bars = insets.getInsets(android.view.WindowInsets.Type.systemBars());
-                v.setPadding(bars.left, bars.top, bars.right, bars.bottom);
+                android.graphics.Insets b = insets.getInsets(android.view.WindowInsets.Type.systemBars());
+                v.setPadding(b.left, b.top, b.right, b.bottom);
                 return insets;
             }
         });
@@ -86,15 +108,9 @@ public class MainActivity extends Activity {
 
     // ---------------- 宠物页 ----------------
 
-    private LinearLayout buildPetPage() {
-        LinearLayout ll = page();
-
-        TextView title = new TextView(this);
-        title.setText("蓝鱼悬浮窗");
-        title.setTextSize(24);
-        title.setTypeface(Typeface.DEFAULT_BOLD);
-        title.setTextColor(0xFFFFFFFF);
-        ll.addView(title);
+    private View buildPetPage() {
+        LinearLayout ll = pageInner();
+        ll.addView(sectionTitle("蓝鱼悬浮窗"));
         ll.addView(hint("① 授予悬浮窗权限\n② 启动悬浮宠物\n③ 回到桌面，可拖动、点击切换动作"));
 
         Button perm = primary("授予悬浮窗权限");
@@ -128,42 +144,61 @@ public class MainActivity extends Activity {
             }
         });
         ll.addView(stop);
-
-        return ll;
+        return wrap(ll);
     }
 
     // ---------------- 外观页 ----------------
 
-    private LinearLayout buildLookPage() {
-        LinearLayout ll = page();
+    private View buildLookPage() {
+        LinearLayout ll = pageInner();
         ll.addView(sectionTitle("外观"));
-        ll.addView(hint("调整悬浮窗大小。位置直接在桌面上拖动宠物即可。"));
+        ll.addView(hint("换一张自己的背景图，或调整悬浮窗大小。"));
 
+        Button pick = primary("选择壁纸");
+        pick.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View v) {
+                Intent i = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+                i.addCategory(Intent.CATEGORY_OPENABLE);
+                i.setType("image/*");
+                try {
+                    startActivityForResult(i, REQ_WALLPAPER);
+                } catch (Exception e) {
+                    toast("没有可用的图片选择器");
+                }
+            }
+        });
+        ll.addView(pick);
+
+        Button clear = primary("清除壁纸");
+        clear.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View v) {
+                prefs().edit().remove(KEY_WALLPAPER).apply();
+                wallpaper.setImageDrawable(null);
+                wallpaper.setBackgroundColor(0xFF0F1114);
+                toast("已恢复默认背景");
+            }
+        });
+        ll.addView(clear);
+
+        ll.addView(hint("悬浮窗大小（需要先启动悬浮宠物）"));
         Button bigger = primary("调大一点");
         bigger.setOnClickListener(new View.OnClickListener() {
-            @Override public void onClick(View v) {
-                if (!Settings.canDrawOverlays(MainActivity.this)) { toast("请先授予悬浮窗权限"); return; }
-                OverlayService.resize(80);
-            }
+            @Override public void onClick(View v) { OverlayService.resize(80); }
         });
         ll.addView(bigger);
 
         Button smaller = primary("调小一点");
         smaller.setOnClickListener(new View.OnClickListener() {
-            @Override public void onClick(View v) {
-                if (!Settings.canDrawOverlays(MainActivity.this)) { toast("请先授予悬浮窗权限"); return; }
-                OverlayService.resize(-80);
-            }
+            @Override public void onClick(View v) { OverlayService.resize(-80); }
         });
         ll.addView(smaller);
-
-        return ll;
+        return wrap(ll);
     }
 
     // ---------------- 设置页 ----------------
 
-    private LinearLayout buildSettingsPage() {
-        LinearLayout ll = page();
+    private View buildSettingsPage() {
+        LinearLayout ll = pageInner();
         ll.addView(sectionTitle("设置"));
         ll.addView(hint("悬浮窗权限：" + (Settings.canDrawOverlays(this) ? "已授予" : "未授予")));
         ll.addView(hint("通知权限：" + (hasNotificationPermission() ? "已授予" : "未授予（不影响悬浮窗）")));
@@ -182,14 +217,13 @@ public class MainActivity extends Activity {
             }
         });
         ll.addView(stop);
-
-        return ll;
+        return wrap(ll);
     }
 
     // ---------------- 关于页 ----------------
 
-    private LinearLayout buildAboutPage() {
-        LinearLayout ll = page();
+    private View buildAboutPage() {
+        LinearLayout ll = pageInner();
         ll.addView(sectionTitle("关于"));
         ll.addView(hint("蓝鲸悬浮窗 · 版本 " + versionName()
                 + "\n常驻桌面的 WebView 悬浮窗，循环播放 WebM 透明动画\n开源协议：MIT"));
@@ -223,24 +257,57 @@ public class MainActivity extends Activity {
             @Override public void onClick(View v) { openUrl(GITHUB); }
         });
         ll.addView(gh);
+        return wrap(ll);
+    }
 
-        return ll;
+    // ---------------- 壁纸 ----------------
+
+    private void applyWallpaper() {
+        String s = prefs().getString(KEY_WALLPAPER, null);
+        if (s == null) return;
+        try {
+            wallpaper.setImageURI(Uri.parse(s));
+        } catch (Exception ignored) {
+        }
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode != REQ_WALLPAPER || resultCode != RESULT_OK || data == null) return;
+        final Uri uri = data.getData();
+        if (uri == null) return;
+        try {
+            getContentResolver().takePersistableUriPermission(uri,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        } catch (Exception ignored) {
+        }
+        prefs().edit().putString(KEY_WALLPAPER, uri.toString()).apply();
+        try {
+            wallpaper.setImageURI(uri);
+        } catch (Exception e) {
+            toast("这张图读不出来，换一张试试");
+        }
+    }
+
+    private SharedPreferences prefs() {
+        return getSharedPreferences(PREFS, MODE_PRIVATE);
     }
 
     // ---------------- 小工具 ----------------
 
-    private LinearLayout page() {
-        ScrollView sc = new ScrollView(this);
+    private LinearLayout pageInner() {
         LinearLayout inner = new LinearLayout(this);
         inner.setOrientation(LinearLayout.VERTICAL);
-        inner.setPadding(dp(22), dp(26), dp(22), dp(16));
-        sc.addView(inner);
+        inner.setPadding(dp(22), dp(26), dp(22), dp(24));
+        return inner;
+    }
 
-        LinearLayout wrap = new LinearLayout(this);
-        wrap.setOrientation(LinearLayout.VERTICAL);
-        wrap.addView(sc, new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.MATCH_PARENT));
-        return wrap;
+    private View wrap(LinearLayout inner) {
+        ScrollView sc = new ScrollView(this);
+        sc.setFillViewport(true);
+        sc.addView(inner);
+        return sc;
     }
 
     private TextView sectionTitle(String t) {
@@ -248,7 +315,7 @@ public class MainActivity extends Activity {
         v.setText(t);
         v.setTextSize(24);
         v.setTypeface(Typeface.DEFAULT_BOLD);
-        v.setTextColor(0xFFFFFFFF);
+        v.setTextColor(Color.WHITE);
         v.setPadding(0, 0, 0, dp(6));
         return v;
     }
@@ -257,9 +324,9 @@ public class MainActivity extends Activity {
         TextView v = new TextView(this);
         v.setText(t);
         v.setTextSize(14);
-        v.setTextColor(0xFFB9C4CF);
+        v.setTextColor(0xFFD3DCE6);
         v.setLineSpacing(dp(4), 1f);
-        v.setPadding(0, dp(4), 0, dp(10));
+        v.setPadding(0, dp(4), 0, dp(12));
         return v;
     }
 
@@ -267,7 +334,7 @@ public class MainActivity extends Activity {
         TextView v = new TextView(this);
         v.setText(t);
         v.setTextSize(13);
-        v.setTextColor(0xFF8FA0B0);
+        v.setTextColor(0xFF9FB0C0);
         v.setPadding(0, dp(16), 0, dp(6));
         return v;
     }
@@ -277,7 +344,7 @@ public class MainActivity extends Activity {
         b.setText(text);
         b.setAllCaps(false);
         b.setTextSize(15);
-        b.setBackgroundColor(0xFF1B2027);
+        b.setBackgroundColor(0xCC1B2027);
         b.setTextColor(0xFFE8EEF4);
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, dp(46));
