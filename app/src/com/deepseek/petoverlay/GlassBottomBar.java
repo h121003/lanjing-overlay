@@ -174,11 +174,11 @@ public class GlassBottomBar extends View {
 
         boolean hasBg = backdrop != null;
         // 玻璃本体：有壁纸时用壁纸色，没壁纸时用深色磨砂
-        p.setColor(withAlpha(tintColor, hasBg ? 0xCC : 0xE6));
+        p.setColor(withAlpha(tintColor, hasBg ? 0x99 : 0xE6));
         c.drawRoundRect(barRect, r, r, p);
 
         // 白色渐变：没有壁纸时非常克制，避免变成一块灰片
-        int a1 = hasBg ? 0x4D : 0x1F, a2 = hasBg ? 0x1C : 0x0D, a3 = hasBg ? 0x0A : 0x05;
+        int a1 = hasBg ? 0x24 : 0x1F, a2 = hasBg ? 0x10 : 0x0D, a3 = hasBg ? 0x06 : 0x05;
         p.setShader(new LinearGradient(0, barRect.top, 0, barRect.bottom,
                 new int[]{(a1 << 24) | 0xFFFFFF, (a2 << 24) | 0xFFFFFF, (a3 << 24) | 0xFFFFFF},
                 new float[]{0f, 0.45f, 1f}, Shader.TileMode.CLAMP));
@@ -224,7 +224,7 @@ public class GlassBottomBar extends View {
         lensClip.addRoundRect(lensRect, lr, lr, Path.Direction.CW);
         c.clipPath(lensClip);
         if (backdrop != null) {
-            float scale = 1.18f;
+            float scale = 1.26f;
             float bw = drawW / rootW * backdrop.getWidth() * scale;
             float bh = drawH / rootH * backdrop.getHeight() * scale;
             float bcx = (cx / rootW) * backdrop.getWidth();
@@ -236,22 +236,22 @@ public class GlassBottomBar extends View {
             p.setAlpha(255);
         }
         // 透镜玻璃色：有壁纸偏亮，没壁纸偏深
-        int g1 = backdrop != null ? 0x40FFFFFF : 0x24FFFFFF;
-        int g2 = backdrop != null ? 0x12FFFFFF : 0x0AFFFFFF;
+        int g1 = backdrop != null ? 0x14FFFFFF : 0x24FFFFFF;
+        int g2 = backdrop != null ? 0x06FFFFFF : 0x0AFFFFFF;
         p.setShader(new LinearGradient(0, lensRect.top, 0, lensRect.bottom,
                 g1, g2, Shader.TileMode.CLAMP));
         c.drawRoundRect(lensRect, lr, lr, p);
         p.setShader(null);
         // 顶部弧形高光
         p.setShader(new LinearGradient(0, lensRect.top, 0, lensRect.top + drawH * 0.5f,
-                0x73FFFFFF, 0x00FFFFFF, Shader.TileMode.CLAMP));
+                0x33FFFFFF, 0x00FFFFFF, Shader.TileMode.CLAMP));
         c.drawRoundRect(new RectF(lensRect.left + dp(2f), lensRect.top + dp(2f),
                 lensRect.right - dp(2f), lensRect.top + drawH * 0.5f), lr, lr, p);
         p.setShader(null);
         c.restore();
 
-        stroke.setStrokeWidth(dp(1.4f));
-        stroke.setColor(0x99FFFFFF);
+        stroke.setStrokeWidth(dp(1.1f));
+        stroke.setColor(0x66FFFFFF);
         c.drawRoundRect(lensRect, lr, lr, stroke);
         stroke.setColor(0x33FFFFFF);
     }
