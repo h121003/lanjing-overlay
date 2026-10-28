@@ -104,6 +104,15 @@ public class MainActivity extends Activity {
 
         setContentView(root);
         applyInsets(root);
+
+        // 仅 debug 构建：启动 0.6 秒后自动展示一次气泡，便于无人值守截图验证
+        boolean debuggable = (getApplicationInfo().flags
+                & android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) != 0;
+        if (debuggable) {
+            bar.postDelayed(new Runnable() {
+                @Override public void run() { bar.previewBubble(2400); }
+            }, 600);
+        }
     }
 
     private void applyInsets(final View root) {

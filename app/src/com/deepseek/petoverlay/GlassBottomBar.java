@@ -399,6 +399,14 @@ public class GlassBottomBar extends View {
         return true;
     }
 
+    /** 调试用：立刻显示气泡 ms 毫秒（自动截图验证效果） */
+    public void previewBubble(long ms) {
+        captureSnapshot();
+        bubbleAlpha = 1f;
+        invalidate();
+        hideBubble(ms);
+    }
+
     private void showBubble() {
         if (alphaAnim != null) alphaAnim.cancel();
         alphaAnim = ValueAnimator.ofFloat(bubbleAlpha, 1f);
