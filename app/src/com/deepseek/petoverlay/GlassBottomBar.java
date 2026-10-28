@@ -32,7 +32,7 @@ public class GlassBottomBar extends View {
     private static final float BAR_H_DP = 56f;
     private static final float MARGIN_X_DP = 18f;
     private static final float MARGIN_BOTTOM_DP = 10f;
-    private static final float MAGNIFY = 1.35f;
+    private static final float MAGNIFY = 1.26f;
 
     /** 折射 + 色散：中心放大，边缘把 RGB 三个通道往不同方向偏 */
     private static final String AGSL =
@@ -46,7 +46,7 @@ public class GlassBottomBar extends View {
             "  float dist = length(d);\n" +
             "  float2 dir = dist > 0.001 ? d / dist : float2(0.0, 0.0);\n" +
             "  float2 q = center + d / mag;\n" +
-            "  float e = disp * smoothstep(radius * 0.45, radius, dist);\n" +
+            "  float e = disp * smoothstep(radius * 0.80, radius, dist);\n" +
             "  half4 cr = content.eval(q - dir * e);\n" +
             "  half4 cg = content.eval(q);\n" +
             "  half4 cb = content.eval(q + dir * e);\n" +
@@ -261,7 +261,7 @@ public class GlassBottomBar extends View {
         rsCls.getMethod("setFloatUniform", String.class, float.class)
                 .invoke(rs, "mag", MAGNIFY);
         rsCls.getMethod("setFloatUniform", String.class, float.class)
-                .invoke(rs, "disp", dp(3.2f));
+                .invoke(rs, "disp", dp(1.1f));
         runtimeShader = rs;
         return (Shader) rs;
     }
@@ -455,6 +455,12 @@ public class GlassBottomBar extends View {
             @Override public void onAnimationUpdate(ValueAnimator v) {
                 float f = (float) v.getAnimatedValue();
                 lensCenterX = from + (to - from) * f;
+                invalidate();
+            }
+        });
+        anim.addListener(new android.animation.AnimatorListenerAdapter() {
+            @Override public void onAnimationEnd(android.animation.Animator a) {
+                lensCenterX = to;
                 invalidate();
             }
         });
