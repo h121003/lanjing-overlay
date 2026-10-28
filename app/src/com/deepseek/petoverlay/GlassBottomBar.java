@@ -172,13 +172,15 @@ public class GlassBottomBar extends View {
         c.drawRoundRect(barRect, r, r, p);
         p.clearShadowLayer();
 
-        // 玻璃本体：壁纸色打底
-        p.setColor(withAlpha(tintColor, 0xCC));
+        boolean hasBg = backdrop != null;
+        // 玻璃本体：有壁纸时用壁纸色，没壁纸时用深色磨砂
+        p.setColor(withAlpha(tintColor, hasBg ? 0xCC : 0xE6));
         c.drawRoundRect(barRect, r, r, p);
 
-        // 白色渐变
+        // 白色渐变：没有壁纸时非常克制，避免变成一块灰片
+        int a1 = hasBg ? 0x4D : 0x1F, a2 = hasBg ? 0x1C : 0x0D, a3 = hasBg ? 0x0A : 0x05;
         p.setShader(new LinearGradient(0, barRect.top, 0, barRect.bottom,
-                new int[]{0x4DFFFFFF, 0x1CFFFFFF, 0x0AFFFFFF},
+                new int[]{(a1 << 24) | 0xFFFFFF, (a2 << 24) | 0xFFFFFF, (a3 << 24) | 0xFFFFFF},
                 new float[]{0f, 0.45f, 1f}, Shader.TileMode.CLAMP));
         c.drawRoundRect(barRect, r, r, p);
         p.setShader(null);
@@ -206,8 +208,9 @@ public class GlassBottomBar extends View {
 
         // 透镜
         float slot = slotWidth();
-        float lensW = slot - dp(6f);
-        float lensH = barRect.height() - dp(6f);
+        // 透镜只包住「图标 + 文字」，不要整条高度
+        float lensW = Math.min(slot - dp(14f), dp(76f));
+        float lensH = dp(46f);
         float drawW = lensW * (1f + deform * 0.30f);
         float drawH = lensH * (1f - deform * 0.26f);
         float cx = lensCenterX;
@@ -232,9 +235,11 @@ public class GlassBottomBar extends View {
             c.drawBitmap(backdrop, src, lensRect, p);
             p.setAlpha(255);
         }
-        // 透镜玻璃色
+        // 透镜玻璃色：有壁纸偏亮，没壁纸偏深
+        int g1 = backdrop != null ? 0x40FFFFFF : 0x24FFFFFF;
+        int g2 = backdrop != null ? 0x12FFFFFF : 0x0AFFFFFF;
         p.setShader(new LinearGradient(0, lensRect.top, 0, lensRect.bottom,
-                0x40FFFFFF, 0x12FFFFFF, Shader.TileMode.CLAMP));
+                g1, g2, Shader.TileMode.CLAMP));
         c.drawRoundRect(lensRect, lr, lr, p);
         p.setShader(null);
         // 顶部弧形高光
@@ -266,8 +271,8 @@ public class GlassBottomBar extends View {
                 c.save();
                 c.scale(1f + deform * 0.22f, 1f - deform * 0.16f, ccx, barRect.centerY());
             }
-            drawIcon(c, i, ccx, barRect.centerY() - dp(7f), dp(9.5f));
-            c.drawText(LABELS[i], ccx, barRect.centerY() + dp(19f), labelPaint);
+            drawIcon(c, i, ccx, barRect.centerY() - dp(6f), dp(8.5f));
+            c.drawText(LABELS[i], ccx, barRect.centerY() + dp(17f), labelPaint);
             if (deformThis) c.restore();
         }
     }
