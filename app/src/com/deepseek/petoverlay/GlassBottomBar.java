@@ -57,7 +57,7 @@ public class GlassBottomBar extends View {
             "  half4 cr = content.eval(q - dir * e);\n" +
             "  half4 cg = content.eval(q);\n" +
             "  half4 cb = content.eval(q + dir * e);\n" +
-            "  return half4(cr.r, cg.g, cb.b, half(0.88));\n" +
+            "  return half4(cr.r, cg.g, cb.b, half(1.0));\n" +
             "}\n";
 
     private final float density;
