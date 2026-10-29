@@ -44,16 +44,20 @@ public class GlassBottomBar extends View {
             "  float2 d = p - center;\n" +
             "  float dist = length(d);\n" +
             "  float2 dir = dist > 0.001 ? d / dist : float2(0.0, 0.0);\n" +
+            "  float2 tang = float2(-dir.y, dir.x);\n" +
             "  float r = clamp(dist / radius, 0.0, 1.0);\n" +
-            "  // 平面（X-Y）：几乎不放大，只在靠边缘处轻微收拢，避免文字被撑大\n" +
-            "  float samp = r * (0.90 + 0.10 * r);\n" +
-            "  float2 q = center + dir * (samp * radius);\n" +
-            "  float e = disp * smoothstep(radius * 0.80, radius, dist);\n" +
+            "  float b = smoothstep(0.58, 1.0, r);\n" +
+            "  // 1) 统一放大（整块同倍率，不做距离相关的放大）\n" +
+            "  float2 q = center + d / 1.22;\n" +
+            "  // 2) 平面弯曲：径向内收 + 切向偏移，让线条在圆边处弯过去\n" +
+            "  q -= dir * (b * b * radius * 0.12);\n" +
+            "  q += tang * (b * b * radius * 0.05);\n" +
+            "  // 3) 色散只在外圈，幅度很小\n" +
+            "  float e = disp * b;\n" +
             "  half4 cr = content.eval(q - dir * e);\n" +
             "  half4 cg = content.eval(q);\n" +
             "  half4 cb = content.eval(q + dir * e);\n" +
-            "  half4 col = half4(cr.r, cg.g, cb.b, half(1.0));\n" +
-            "  return col;\n" +
+            "  return half4(cr.r, cg.g, cb.b, half(0.88));\n" +
             "}\n";
 
     private final float density;
@@ -290,7 +294,7 @@ public class GlassBottomBar extends View {
         rsCls.getMethod("setFloatUniform", String.class, float.class)
                 .invoke(rs, "radius", radius);
         rsCls.getMethod("setFloatUniform", String.class, float.class)
-                .invoke(rs, "disp", dp(0.8f));
+                .invoke(rs, "disp", dp(0.45f));
         return (Shader) rs;
     }
 
