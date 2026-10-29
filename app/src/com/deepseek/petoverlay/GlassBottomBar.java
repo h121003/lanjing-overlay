@@ -183,8 +183,8 @@ public class GlassBottomBar extends View {
         }
 
         paint.setStyle(Paint.Style.STROKE);
-        paint.setStrokeWidth(dp(1f));
-        paint.setColor(dark ? 0x1AFFFFFF : 0x1A000000);
+        paint.setStrokeWidth(dp(1.2f));
+        paint.setColor(dark ? 0x3DFFFFFF : 0x30000000);
         c.drawRoundRect(barRect, r, r, paint);
         paint.setStyle(Paint.Style.FILL);
     }
@@ -244,6 +244,11 @@ public class GlassBottomBar extends View {
             Paint bg = new Paint();
             bg.setColor(dark ? 0xFF151A20 : 0xFFF2F5F9);
             cv.drawRect(0, 0, w, h, bg);
+            Paint line = new Paint(Paint.ANTI_ALIAS_FLAG);
+            line.setStyle(Paint.Style.STROKE);
+            line.setStrokeWidth(dp(1.2f));
+            line.setColor(dark ? 0x3DFFFFFF : 0x30000000);
+            cv.drawRoundRect(barRect, barRect.height() / 2f, barRect.height() / 2f, line);
             drawItems(cv);
         } catch (Throwable t) {
             snapshot = null;
