@@ -45,8 +45,8 @@ public class GlassBottomBar extends View {
             "  float dist = length(d);\n" +
             "  float2 dir = dist > 0.001 ? d / dist : float2(0.0, 0.0);\n" +
             "  float r = clamp(dist / radius, 0.0, 1.0);\n" +
-            "  // 平面（X-Y）径向形变：中间收、边缘外扩，线条向圆周弯\n" +
-            "  float samp = r + 0.55 * pow(r, 5.0);\n" +
+            "  // 平面（X-Y）放大：中心约 1.6 倍，边缘 1:1，靠边缘自然收拢\n" +
+            "  float samp = r * (0.62 + 0.38 * r);\n" +
             "  float2 q = center + dir * (samp * radius);\n" +
             "  float e = disp * smoothstep(radius * 0.80, radius, dist);\n" +
             "  half4 cr = content.eval(q - dir * e);\n" +
