@@ -207,16 +207,16 @@ public class GlassBottomBar extends View {
             drawMagnifiedFallback(c, cx, cy);
         }
 
-        // 显式补一条「被放大的栏体边线」，保证玻璃里一定看得到这条线
-        c.save();
-        c.clipPath(bubblePath);
-        // 线跟着气泡一起被拉扁，避免变扁时被椭圆裁掉
-        c.scale(1.22f * sx, 1.22f * sy, cx, cy);
+        // 显式补一条「被放大的栏体边线」：按与着色器一致的映射逐点算出来，
+        // 这样线会像内容一样在圆边处向上/向下弯
         Paint edge = new Paint(Paint.ANTI_ALIAS_FLAG);
         edge.setStyle(Paint.Style.STROKE);
         edge.setStrokeWidth(dp(1.6f));
         edge.setColor(dark ? 0x66FFFFFF : 0x55000000);
-        c.drawRoundRect(barRect, barRect.height() / 2f, barRect.height() / 2f, edge);
+        c.save();
+        c.clipPath(bubblePath);
+        drawWarpedEdge(c, cx, cy, Math.min(rx, ry), barRect.top, edge);
+        drawWarpedEdge(c, cx, cy, Math.min(rx, ry), barRect.bottom, edge);
         c.restore();
 
         // 玻璃色：统一一层很淡的白，不做上下渐变（避免像球）
@@ -236,6 +236,36 @@ public class GlassBottomBar extends View {
         paint.setShader(null);
         paint.setStyle(Paint.Style.FILL);
         paint.setAlpha(255);
+    }
+
+    /** 把栏体的某一条水平边，按着色器同样的映射画成弯线 */
+    private void drawWarpedEdge(Canvas c, float cx, float cy, float radius,
+                                float edgeY, Paint paint) {
+        Path path = new Path();
+        boolean started = false;
+        int steps = 48;
+        float left = barRect.left, right = barRect.right;
+        for (int i = 0; i <= steps; i++) {
+            float x = left + (right - left) * i / (float) steps;
+            float dx = x - cx, dy = edgeY - cy;
+            float dist = (float) Math.hypot(dx, dy);
+            float r = Math.min(1f, dist / radius);
+            float b = smoothstep(0.58f, 1f, r);
+            float dirx = dist > 0.001f ? dx / dist : 0f;
+            float diry = dist > 0.001f ? dy / dist : 0f;
+            // 与 AGSL 相反的变换：先把内容放大 1.22，再叠加径向/切向弯曲
+            float px = cx + dx * 1.22f + dirx * (b * b * radius * 0.12f)
+                    - (-diry) * (b * b * radius * 0.05f);
+            float py = cy + dy * 1.22f + diry * (b * b * radius * 0.12f)
+                    - (dirx) * (b * b * radius * 0.05f);
+            if (!started) { path.moveTo(px, py); started = true; } else { path.lineTo(px, py); }
+        }
+        c.drawPath(path, paint);
+    }
+
+    private static float smoothstep(float a, float b, float x) {
+        float t = Math.max(0f, Math.min(1f, (x - a) / (b - a)));
+        return t * t * (3f - 2f * t);
     }
 
     /** 快照一次，作为折射纹理 */
