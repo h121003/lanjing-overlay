@@ -47,7 +47,7 @@ public class GlassBottomBar extends View {
             "  float2 dir = dist > 0.001 ? d / dist : float2(0.0, 0.0);\n" +
             "  float r = clamp(dist / radius, 0.0, 1.0);\n" +
             "  // 平面（X-Y）径向形变：中间收、边缘外扩，线条向圆周弯\n" +
-            "  float samp = r * (0.52 + 0.48 * r * r);\n" +
+            "  float samp = r + 0.55 * pow(r, 5.0);\n" +
             "  float2 q = center + dir * (samp * radius);\n" +
             "  float e = disp * smoothstep(radius * 0.80, radius, dist);\n" +
             "  half4 cr = content.eval(q - dir * e);\n" +
@@ -142,10 +142,8 @@ public class GlassBottomBar extends View {
         c.translate(shift, 0f);
         drawBar(c, r);
         drawItems(c);
-        c.restore();
-
-        // 气泡按未位移坐标绘制，保证与快照纹理 1:1 对齐
         if (bubbleAlpha > 0.01f) drawBubble(c);
+        c.restore();
     }
 
     private void drawBar(Canvas c, float r) {
@@ -192,7 +190,7 @@ public class GlassBottomBar extends View {
 
         // 玻璃色：统一一层很淡的白，不做上下渐变（避免像球）
         paint.setShader(null);
-        paint.setColor(((int) (0x0F * bubbleAlpha) << 24) | 0xFFFFFF);
+        paint.setColor(((int) (0x0A * bubbleAlpha) << 24) | 0xFFFFFF);
         c.drawPath(bubblePath, paint);
 
         // 亮边
@@ -217,11 +215,10 @@ public class GlassBottomBar extends View {
             android.graphics.Bitmap bmp = android.graphics.Bitmap.createBitmap(
                     w, h, android.graphics.Bitmap.Config.ARGB_8888);
             Canvas cv = new Canvas(bmp);
-            // 只画纯色底 + 图标文字：不要选中丸/边框/阴影，避免放大后出现
-            // 同心渐变，看着像是个球
+            // 整张快照先铺底色：气泡顶部会采样到栏体上方，铺底色避免出现空洞
             Paint bg = new Paint();
             bg.setColor(dark ? 0xFF151A20 : 0xFFF2F5F9);
-            cv.drawRoundRect(barRect, barRect.height() / 2f, barRect.height() / 2f, bg);
+            cv.drawRect(0, 0, w, h, bg);
             drawItems(cv);
             snapshot = bmp;
         } catch (Throwable t) {
