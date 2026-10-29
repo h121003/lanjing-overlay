@@ -110,7 +110,10 @@ public class GlassBottomBar extends View {
 
     public void setSelectedSilently(int i) {
         selected = Math.max(0, Math.min(LABELS.length - 1, i));
-        lensCenterX = centerOf(selected);
+        // 动画进行中不要强行对齐，否则滑动动画会被立刻"钉"到终点（看上去像没动）
+        if (anim == null || !anim.isRunning()) {
+            lensCenterX = centerOf(selected);
+        }
         invalidate();
     }
 
