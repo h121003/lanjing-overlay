@@ -77,6 +77,7 @@ public class GlassBottomBar extends View {
     private float downX = 0f, dragStartCenter = 0f, lastX = 0f;
     private long lastT = 0L;
     private ValueAnimator anim, alphaAnim, pressAnim;
+    private Runnable pendingHide;
     private android.graphics.Bitmap snapshot;   // 任务栏快照（折射采样源）
     private Object runtimeShader;               // 复用 RuntimeShader（API 33+）
     private android.graphics.BitmapShader shaderInput;
@@ -373,6 +374,11 @@ public class GlassBottomBar extends View {
                 lastX = downX;
                 lastT = System.currentTimeMillis();
                 dragStartCenter = lensCenterX;
+                // 取消上一次松手后安排的淡出，否则长按拖动时气泡会被它掐掉
+                if (pendingHide != null) {
+                    removeCallbacks(pendingHide);
+                    pendingHide = null;
+                }
                 captureSnapshot();
                 showBubble();
                 animatePress(1f, 110);
@@ -444,8 +450,10 @@ public class GlassBottomBar extends View {
     }
 
     private void hideBubble(long delay) {
-        postDelayed(new Runnable() {
+        if (pendingHide != null) removeCallbacks(pendingHide);
+        pendingHide = new Runnable() {
             @Override public void run() {
+                pendingHide = null;
                 if (alphaAnim != null) alphaAnim.cancel();
                 alphaAnim = ValueAnimator.ofFloat(bubbleAlpha, 0f);
                 alphaAnim.setDuration(220);
@@ -457,7 +465,8 @@ public class GlassBottomBar extends View {
                 });
                 alphaAnim.start();
             }
-        }, delay);
+        };
+        postDelayed(pendingHide, delay);
     }
 
     private void animatePress(final float to, int duration) {
