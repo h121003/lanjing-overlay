@@ -207,6 +207,17 @@ public class GlassBottomBar extends View {
             drawMagnifiedFallback(c, cx, cy);
         }
 
+        // 显式补一条「被放大的栏体边线」，保证玻璃里一定看得到这条线
+        c.save();
+        c.clipPath(bubblePath);
+        c.scale(1.22f, 1.22f, cx, cy);
+        Paint edge = new Paint(Paint.ANTI_ALIAS_FLAG);
+        edge.setStyle(Paint.Style.STROKE);
+        edge.setStrokeWidth(dp(1.6f));
+        edge.setColor(dark ? 0x66FFFFFF : 0x55000000);
+        c.drawRoundRect(barRect, barRect.height() / 2f, barRect.height() / 2f, edge);
+        c.restore();
+
         // 玻璃色：统一一层很淡的白，不做上下渐变（避免像球）
         paint.setShader(null);
         paint.setColor(((int) (0x0A * bubbleAlpha) << 24) | 0xFFFFFF);
