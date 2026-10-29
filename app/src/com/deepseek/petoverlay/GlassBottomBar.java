@@ -215,8 +215,8 @@ public class GlassBottomBar extends View {
         edge.setColor(dark ? 0x66FFFFFF : 0x55000000);
         c.save();
         c.clipPath(bubblePath);
-        drawWarpedEdge(c, cx, cy, Math.min(rx, ry), barRect.top, edge);
-        drawWarpedEdge(c, cx, cy, Math.min(rx, ry), barRect.bottom, edge);
+        drawWarpedEdge(c, cx, cy, Math.min(rx, ry), barRect.top + dp(5f), sx, sy, edge);
+        drawWarpedEdge(c, cx, cy, Math.min(rx, ry), barRect.bottom - dp(5f), sx, sy, edge);
         c.restore();
 
         // 玻璃色：统一一层很淡的白，不做上下渐变（避免像球）
@@ -240,7 +240,7 @@ public class GlassBottomBar extends View {
 
     /** 把栏体的某一条水平边，按着色器同样的映射画成弯线 */
     private void drawWarpedEdge(Canvas c, float cx, float cy, float radius,
-                                float edgeY, Paint paint) {
+                                float edgeY, float sx, float sy, Paint paint) {
         Path path = new Path();
         boolean started = false;
         int steps = 48;
@@ -254,10 +254,9 @@ public class GlassBottomBar extends View {
             float dirx = dist > 0.001f ? dx / dist : 0f;
             float diry = dist > 0.001f ? dy / dist : 0f;
             // 与 AGSL 相反的变换：先把内容放大 1.22，再叠加径向/切向弯曲
-            float px = cx + dx * 1.22f + dirx * (b * b * radius * 0.12f)
-                    - (-diry) * (b * b * radius * 0.05f);
-            float py = cy + dy * 1.22f + diry * (b * b * radius * 0.12f)
-                    - (dirx) * (b * b * radius * 0.05f);
+            float k = b * b * radius;
+            float px = cx + dx * 1.22f * sx + dirx * (k * 0.22f) + diry * (k * 0.09f);
+            float py = cy + dy * 1.22f * sy + diry * (k * 0.22f) - dirx * (k * 0.09f);
             if (!started) { path.moveTo(px, py); started = true; } else { path.lineTo(px, py); }
         }
         c.drawPath(path, paint);
