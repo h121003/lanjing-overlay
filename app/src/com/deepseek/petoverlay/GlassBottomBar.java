@@ -210,7 +210,8 @@ public class GlassBottomBar extends View {
         // 显式补一条「被放大的栏体边线」，保证玻璃里一定看得到这条线
         c.save();
         c.clipPath(bubblePath);
-        c.scale(1.22f, 1.22f, cx, cy);
+        // 线跟着气泡一起被拉扁，避免变扁时被椭圆裁掉
+        c.scale(1.22f * sx, 1.22f * sy, cx, cy);
         Paint edge = new Paint(Paint.ANTI_ALIAS_FLAG);
         edge.setStyle(Paint.Style.STROKE);
         edge.setStrokeWidth(dp(1.6f));
