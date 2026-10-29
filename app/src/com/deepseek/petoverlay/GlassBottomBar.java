@@ -39,7 +39,6 @@ public class GlassBottomBar extends View {
             "uniform shader content;\n" +
             "uniform float2 center;\n" +
             "uniform float radius;\n" +
-            "uniform float mag;\n" +
             "uniform float disp;\n" +
             "half4 main(float2 p) {\n" +
             "  float2 d = p - center;\n" +
@@ -79,7 +78,9 @@ public class GlassBottomBar extends View {
     private long lastT = 0L;
     private ValueAnimator anim, alphaAnim, pressAnim;
     private android.graphics.Bitmap snapshot;   // 任务栏快照（折射采样源）
-    private Object runtimeShader;               // RuntimeShader（API 33+）
+    private Object runtimeShader;               // 复用 RuntimeShader（API 33+）
+    private android.graphics.BitmapShader shaderInput;
+    private android.graphics.Bitmap shaderBoundTo;
     private boolean shaderBroken = false;
     private OnTabSelected listener;
 
@@ -149,6 +150,16 @@ public class GlassBottomBar extends View {
         c.restore();
     }
 
+    @Override
+    protected void onDetachedFromWindow() {
+        super.onDetachedFromWindow();
+        if (snapshot != null && !snapshot.isRecycled()) snapshot.recycle();
+        snapshot = null;
+        shaderBoundTo = null;
+        shaderInput = null;
+        runtimeShader = null;
+    }
+
     private void drawBar(Canvas c, float r) {
         paint.setShader(null);
         paint.setStyle(Paint.Style.FILL);
@@ -215,15 +226,20 @@ public class GlassBottomBar extends View {
         try {
             int w = getWidth(), h = getHeight();
             if (w <= 0 || h <= 0) return;
-            android.graphics.Bitmap bmp = android.graphics.Bitmap.createBitmap(
-                    w, h, android.graphics.Bitmap.Config.ARGB_8888);
-            Canvas cv = new Canvas(bmp);
+            if (snapshot == null || snapshot.isRecycled()
+                    || snapshot.getWidth() != w || snapshot.getHeight() != h) {
+                if (snapshot != null && !snapshot.isRecycled()) snapshot.recycle();
+                snapshot = null;
+                shaderBoundTo = null;
+                snapshot = android.graphics.Bitmap.createBitmap(
+                        w, h, android.graphics.Bitmap.Config.ARGB_8888);
+            }
+            Canvas cv = new Canvas(snapshot);
             // 整张快照先铺底色：气泡顶部会采样到栏体上方，铺底色避免出现空洞
             Paint bg = new Paint();
             bg.setColor(dark ? 0xFF151A20 : 0xFFF2F5F9);
             cv.drawRect(0, 0, w, h, bg);
             drawItems(cv);
-            snapshot = bmp;
         } catch (Throwable t) {
             snapshot = null;
         }
@@ -255,20 +271,25 @@ public class GlassBottomBar extends View {
     @SuppressWarnings("NewApi")
     private Shader buildShader(float cx, float cy, float radius) throws Exception {
         Class<?> rsCls = Class.forName("android.graphics.RuntimeShader");
-        Object rs = rsCls.getConstructor(String.class).newInstance(AGSL);
         Class<?> shaderCls = Class.forName("android.graphics.Shader");
-        android.graphics.BitmapShader bs = new android.graphics.BitmapShader(
-                snapshot, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP);
-        rsCls.getMethod("setInputShader", String.class, shaderCls).invoke(rs, "content", bs);
+        if (runtimeShader == null) {
+            runtimeShader = rsCls.getConstructor(String.class).newInstance(AGSL);
+        }
+        Object rs = runtimeShader;
+        // 纹理只在快照换了才重新绑定，避免每帧重建 BitmapShader
+        if (shaderBoundTo != snapshot) {
+            shaderInput = new android.graphics.BitmapShader(
+                    snapshot, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP);
+            rsCls.getMethod("setInputShader", String.class, shaderCls)
+                    .invoke(rs, "content", shaderInput);
+            shaderBoundTo = snapshot;
+        }
         rsCls.getMethod("setFloatUniform", String.class, float[].class)
                 .invoke(rs, "center", new float[]{cx, cy});
         rsCls.getMethod("setFloatUniform", String.class, float.class)
                 .invoke(rs, "radius", radius);
         rsCls.getMethod("setFloatUniform", String.class, float.class)
-                .invoke(rs, "mag", MAGNIFY);
-        rsCls.getMethod("setFloatUniform", String.class, float.class)
                 .invoke(rs, "disp", dp(0.8f));
-        runtimeShader = rs;
         return (Shader) rs;
     }
 
