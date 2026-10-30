@@ -46,18 +46,22 @@ public class GlassBottomBar extends View {
             "  float2 dir = dist > 0.001 ? d / dist : float2(0.0, 0.0);\n" +
             "  float2 tang = float2(-dir.y, dir.x);\n" +
             "  float r = clamp(dist / radius, 0.0, 1.0);\n" +
-            "  float b = smoothstep(0.58, 1.0, r);\n" +
-            "  // 1) 统一放大（整块同倍率，不做距离相关的放大）\n" +
-            "  float2 q = center + d / 1.22;\n" +
-            "  // 2) 平面弯曲：径向内收 + 切向偏移，让线条在圆边处弯过去\n" +
-            "  q -= dir * (b * b * radius * 0.12);\n" +
-            "  q += tang * (b * b * radius * 0.05);\n" +
-            "  // 3) 色散只在外圈，幅度很小\n" +
+            "  float b = smoothstep(0.45, 1.0, r);\n" +
+            "  // 中心放大 1.18 倍；越靠边放得越大（1.18 → 1.75）\n" +
+            "  float mag = 1.18 + 0.57 * b;\n" +
+            "  float2 q = center + d / mag;\n" +
+            "  // 边缘切向扭曲\n" +
+            "  q += tang * (b * b * radius * 0.10);\n" +
+            "  half4 c = content.eval(q);\n" +
+            "  // 边缘伪模糊：五点平均，只在外圈生效\n" +
+            "  float k = b * 3.5;\n" +
+            "  half4 s = content.eval(q + float2(k, 0.0)) + content.eval(q - float2(k, 0.0))\n" +
+            "         + content.eval(q + float2(0.0, k)) + content.eval(q - float2(0.0, k));\n" +
+            "  c = mix(c, (c + s) * 0.2, b);\n" +
             "  float e = disp * b;\n" +
-            "  half4 cr = content.eval(q - dir * e);\n" +
-            "  half4 cg = content.eval(q);\n" +
+            "  half4 cr = c;\n" +
             "  half4 cb = content.eval(q + dir * e);\n" +
-            "  return half4(cr.r, cg.g, cb.b, half(1.0));\n" +
+            "  return half4(cr.r, c.g, cb.b, half(1.0));\n" +
             "}\n";
 
     private final float density;
@@ -215,8 +219,10 @@ public class GlassBottomBar extends View {
         edge.setColor(dark ? 0x66FFFFFF : 0x55000000);
         c.save();
         c.clipPath(bubblePath);
-        drawWarpedEdge(c, cx, cy, Math.min(rx, ry), barRect.top + dp(5f), sx, sy, edge);
-        drawWarpedEdge(c, cx, cy, Math.min(rx, ry), barRect.bottom - dp(5f), sx, sy, edge);
+        drawEdgeLine(c, cx, cy, Math.min(rx, ry), barRect.top + dp(5f), true,
+                dark ? 0x66FFFFFF : 0x55000000);
+        drawEdgeLine(c, cx, cy, Math.min(rx, ry), barRect.bottom - dp(5f), false,
+                dark ? 0x55FFFFFF : 0x44000000);
         c.restore();
 
         // 玻璃色：统一一层很淡的白，不做上下渐变（避免像球）
@@ -239,27 +245,39 @@ public class GlassBottomBar extends View {
     }
 
     /** 把栏体的某一条水平边，按着色器同样的映射画成弯线 */
-    private void drawWarpedEdge(Canvas c, float cx, float cy, float radius,
-                                float edgeY, float sx, float sy, Paint paint) {
-        Path path = new Path();
-        boolean started = false;
-        int steps = 48;
-        float left = barRect.left, right = barRect.right;
+    private void drawEdgeLine(Canvas c, float cx, float cy, float radius,
+                              float edgeY, boolean top, float color) {
+        float shiftY = cy - barRect.centerY();      // 跟随气泡上下
+        float half = radius;
+        int steps = 60;
+        Path sharp = new Path();
+        Path soft = new Path();
+        boolean sharpStarted = false, softStarted = false;
         for (int i = 0; i <= steps; i++) {
-            float x = left + (right - left) * i / (float) steps;
-            float dx = x - cx, dy = edgeY - cy;
-            float dist = (float) Math.hypot(dx, dy);
-            float r = Math.min(1f, dist / radius);
-            float b = smoothstep(0.58f, 1f, r);
-            float dirx = dist > 0.001f ? dx / dist : 0f;
-            float diry = dist > 0.001f ? dy / dist : 0f;
-            // 与 AGSL 相反的变换：先把内容放大 1.22，再叠加径向/切向弯曲
-            float k = b * b * radius;
-            float px = cx + dx * 1.22f * sx + dirx * (k * 0.22f) + diry * (k * 0.09f);
-            float py = cy + dy * 1.22f * sy + diry * (k * 0.22f) - dirx * (k * 0.09f);
-            if (!started) { path.moveTo(px, py); started = true; } else { path.lineTo(px, py); }
+            float x = barRect.left + (barRect.right - barRect.left) * i / (float) steps;
+            float dx = x - cx;
+            float t = Math.min(1f, Math.abs(dx) / half);
+            float bow = smoothstep(0.45f, 1f, t);
+            bow = bow * bow * radius * 0.28f * (top ? -1f : 1f);
+            float y = edgeY + shiftY + bow;
+            if (t < 0.72f) {
+                if (!sharpStarted) { sharp.moveTo(x, y); sharpStarted = true; }
+                else sharp.lineTo(x, y);
+            }
+            if (t > 0.55f) {
+                if (!softStarted) { soft.moveTo(x, y); softStarted = true; }
+                else soft.lineTo(x, y);
+            }
         }
-        c.drawPath(path, paint);
+        Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        paint.setStyle(Paint.Style.STROKE);
+        paint.setStrokeWidth(dp(1.6f));
+        paint.setColor(color);
+        if (sharpStarted) c.drawPath(sharp, paint);
+        // 弯的那一段更宽更淡 = 模糊
+        paint.setStrokeWidth(dp(4.5f));
+        paint.setColor((int) (0x30 * bubbleAlpha) << 24 | 0xFFFFFF);
+        if (softStarted) c.drawPath(soft, paint);
     }
 
     private static float smoothstep(float a, float b, float x) {
