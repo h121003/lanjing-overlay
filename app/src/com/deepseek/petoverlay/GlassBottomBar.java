@@ -47,21 +47,21 @@ public class GlassBottomBar extends View {
             "  float2 tang = float2(-dir.y, dir.x);\n" +
             "  float r = clamp(dist / radius, 0.0, 1.0);\n" +
             "  float b = smoothstep(0.45, 1.0, r);\n" +
-            "  // 中心放大 1.18 倍；越靠边放得越大（1.18 → 1.75）\n" +
-            "  float mag = 1.18 + 0.57 * b;\n" +
+            "  // 只有在左右两侧才做弯曲与模糊，上下保持清晰\n" +
+            "  float side = smoothstep(0.45, 1.0, abs(dir.x));\n" +
+            "  float edge = b * side;\n" +
+            "  float mag = 1.18 + 0.40 * b;\n" +
             "  float2 q = center + d / mag;\n" +
-            "  // 边缘切向扭曲\n" +
-            "  q += tang * (b * b * radius * 0.10);\n" +
+            "  q += tang * (edge * edge * radius * 0.14);\n" +
             "  half4 c = content.eval(q);\n" +
-            "  // 边缘伪模糊：五点平均，只在外圈生效\n" +
-            "  float k = b * 3.5;\n" +
+            "  // 左右两侧的伪模糊\n" +
+            "  float k = edge * 4.0;\n" +
             "  half4 s = content.eval(q + float2(k, 0.0)) + content.eval(q - float2(k, 0.0))\n" +
             "         + content.eval(q + float2(0.0, k)) + content.eval(q - float2(0.0, k));\n" +
-            "  c = mix(c, (c + s) * 0.2, b);\n" +
-            "  float e = disp * b;\n" +
-            "  half4 cr = c;\n" +
+            "  c = mix(c, (c + s) * 0.2, edge);\n" +
+            "  float e = disp * edge;\n" +
             "  half4 cb = content.eval(q + dir * e);\n" +
-            "  return half4(cr.r, c.g, cb.b, half(1.0));\n" +
+            "  return half4(c.r, c.g, cb.b, half(1.0));\n" +
             "}\n";
 
     private final float density;
