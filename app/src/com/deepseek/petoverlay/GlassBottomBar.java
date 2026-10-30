@@ -246,7 +246,7 @@ public class GlassBottomBar extends View {
 
     /** 把栏体的某一条水平边，按着色器同样的映射画成弯线 */
     private void drawEdgeLine(Canvas c, float cx, float cy, float radius,
-                              float edgeY, boolean top, float color) {
+                              float edgeY, boolean top, int color) {
         float shiftY = cy - barRect.centerY();      // 跟随气泡上下
         float half = radius;
         int steps = 60;
