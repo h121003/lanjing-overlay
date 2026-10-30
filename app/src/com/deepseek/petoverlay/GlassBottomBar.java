@@ -219,9 +219,10 @@ public class GlassBottomBar extends View {
         edge.setColor(dark ? 0x66FFFFFF : 0x55000000);
         c.save();
         c.clipPath(bubblePath);
-        drawEdgeLine(c, cx, cy, Math.min(rx, ry), barRect.top + dp(5f), true,
+        float away = deform * dp(7f);   // 压扁时把线往外推，避免压到文字
+        drawEdgeLine(c, cx, cy, Math.min(rx, ry), barRect.top + dp(5f) - away, true,
                 dark ? 0x66FFFFFF : 0x55000000);
-        drawEdgeLine(c, cx, cy, Math.min(rx, ry), barRect.bottom - dp(5f), false,
+        drawEdgeLine(c, cx, cy, Math.min(rx, ry), barRect.bottom - dp(5f) + away, false,
                 dark ? 0x55FFFFFF : 0x44000000);
         c.restore();
 
@@ -460,7 +461,8 @@ public class GlassBottomBar extends View {
                 float v = Math.abs(e.getX() - lastX) / dt;
                 lastX = e.getX();
                 lastT = now;
-                deform = Math.min(0.9f, deform * 0.5f + v * 0.7f);
+                // 基础形变 0.22：慢速拖动也有压扁，快速再叠加
+                deform = Math.min(0.9f, Math.max(0.22f, deform * 0.5f + v * 0.7f));
 
                 float slot = slotWidth();
                 float minC = barRect.left + slot / 2f;
