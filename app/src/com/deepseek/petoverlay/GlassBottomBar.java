@@ -44,10 +44,15 @@ public class GlassBottomBar extends View {
             "  float2 d = p - center;\n" +
             "  float dist = length(d);\n" +
             "  float2 dir = dist > 0.001 ? d / dist : float2(0.0, 0.0);\n" +
+            "  float2 tang = float2(-dir.y, dir.x);\n" +
             "  float r = clamp(dist / radius, 0.0, 1.0);\n" +
-            "  float b = smoothstep(0.35, 1.0, r);\n" +
-            "  // 平面径向压缩：中心不动，越靠边压缩越强 → 直线在圆内被压弯\n" +
-            "  float2 q = center + dir * (dist * (1.0 - 0.38 * b * b));\n" +
+            "  float b = smoothstep(0.58, 1.0, r);\n" +
+            "  // 1) 统一放大（整块同倍率，不做距离相关的放大）\n" +
+            "  float2 q = center + d / 1.22;\n" +
+            "  // 2) 平面弯曲：径向内收 + 切向偏移，让线条在圆边处弯过去\n" +
+            "  q -= dir * (b * b * radius * 0.12);\n" +
+            "  q += tang * (b * b * radius * 0.05);\n" +
+            "  // 3) 色散只在外圈，幅度很小\n" +
             "  float e = disp * b;\n" +
             "  half4 cr = content.eval(q - dir * e);\n" +
             "  half4 cg = content.eval(q);\n" +
@@ -202,6 +207,18 @@ public class GlassBottomBar extends View {
             drawMagnifiedFallback(c, cx, cy);
         }
 
+        // 显式补一条「被放大的栏体边线」：按与着色器一致的映射逐点算出来，
+        // 这样线会像内容一样在圆边处向上/向下弯
+        Paint edge = new Paint(Paint.ANTI_ALIAS_FLAG);
+        edge.setStyle(Paint.Style.STROKE);
+        edge.setStrokeWidth(dp(1.6f));
+        edge.setColor(dark ? 0x66FFFFFF : 0x55000000);
+        c.save();
+        c.clipPath(bubblePath);
+        drawWarpedEdge(c, cx, cy, Math.min(rx, ry), barRect.top + dp(5f), sx, sy, edge);
+        drawWarpedEdge(c, cx, cy, Math.min(rx, ry), barRect.bottom - dp(5f), sx, sy, edge);
+        c.restore();
+
         // 玻璃色：统一一层很淡的白，不做上下渐变（避免像球）
         paint.setShader(null);
         paint.setColor(((int) (0x0A * bubbleAlpha) << 24) | 0xFFFFFF);
@@ -221,6 +238,35 @@ public class GlassBottomBar extends View {
         paint.setAlpha(255);
     }
 
+    /** 把栏体的某一条水平边，按着色器同样的映射画成弯线 */
+    private void drawWarpedEdge(Canvas c, float cx, float cy, float radius,
+                                float edgeY, float sx, float sy, Paint paint) {
+        Path path = new Path();
+        boolean started = false;
+        int steps = 48;
+        float left = barRect.left, right = barRect.right;
+        for (int i = 0; i <= steps; i++) {
+            float x = left + (right - left) * i / (float) steps;
+            float dx = x - cx, dy = edgeY - cy;
+            float dist = (float) Math.hypot(dx, dy);
+            float r = Math.min(1f, dist / radius);
+            float b = smoothstep(0.58f, 1f, r);
+            float dirx = dist > 0.001f ? dx / dist : 0f;
+            float diry = dist > 0.001f ? dy / dist : 0f;
+            // 与 AGSL 相反的变换：先把内容放大 1.22，再叠加径向/切向弯曲
+            float k = b * b * radius;
+            float px = cx + dx * 1.22f * sx + dirx * (k * 0.22f) + diry * (k * 0.09f);
+            float py = cy + dy * 1.22f * sy + diry * (k * 0.22f) - dirx * (k * 0.09f);
+            if (!started) { path.moveTo(px, py); started = true; } else { path.lineTo(px, py); }
+        }
+        c.drawPath(path, paint);
+    }
+
+    private static float smoothstep(float a, float b, float x) {
+        float t = Math.max(0f, Math.min(1f, (x - a) / (b - a)));
+        return t * t * (3f - 2f * t);
+    }
+
     /** 快照一次，作为折射纹理 */
     private void captureSnapshot() {
         try {
@@ -235,7 +281,10 @@ public class GlassBottomBar extends View {
                         w, h, android.graphics.Bitmap.Config.ARGB_8888);
             }
             Canvas cv = new Canvas(snapshot);
-            // 透明底：只画边线与图标文字，玻璃里透出的是真实栏体，不会变成一块亮圆片
+            // 整张快照先铺底色：气泡顶部会采样到栏体上方，铺底色避免出现空洞
+            Paint bg = new Paint();
+            bg.setColor(dark ? 0xFF151A20 : 0xFFF2F5F9);
+            cv.drawRect(0, 0, w, h, bg);
             Paint line = new Paint(Paint.ANTI_ALIAS_FLAG);
             line.setStyle(Paint.Style.STROKE);
             line.setStrokeWidth(dp(1.2f));
