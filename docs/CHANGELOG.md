@@ -23,8 +23,8 @@
 | versionName | 1.1 |
 | versionCode | 5 |
 | 动画 | 106 段 |
-| 大小 | 55,201,605 字节 |
-| SHA-256 | `e6cb7e2c684254dddbfad6ed1bd684919e3f49f4199a629d7170286d7c21ec87` |
+| 大小 | 55,207,697 字节 |
+| SHA-256 | `16139e0e1ebc842e478570cf71f39db5de81ad3c4e41dab428891ddad822fd32` |
 
 **签名**：自签名（非 Google Play），证书主体 `CN=Lanjing Overlay, O=h121003`，
 2048 位 RSA，有效期至 2051-10-24，v1 + v2 双签。
