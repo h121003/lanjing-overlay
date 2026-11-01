@@ -4,15 +4,13 @@
 
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Android%207.0%2B-3ddc84.svg)](#安装)
-[![Version](https://img.shields.io/badge/version-1.0-orange.svg)](docs/CHANGELOG.md)
-[![Next](https://img.shields.io/badge/next-v1.1%20%C2%B7%202026--11--01-blueviolet.svg)](docs/ROADMAP.md)
+[![Version](https://img.shields.io/badge/version-1.1-orange.svg)](docs/CHANGELOG.md)
+[![Next](https://img.shields.io/badge/released-1.1%20%C2%B7%202026--11--01-brightgreen.svg)](docs/ROADMAP.md)
 [![Package](https://img.shields.io/badge/package-com.deepseek.petoverlay-6f42c1.svg)](#安装)
 
 ---
 
-> ## 🚧 v1.1 预告
->
-> **预计 2026-11-01 发布**
+> ## ✅ v1.1 已发布（2026-11-01）
 >
 > - 动画扩充至 **106 段**（原 12 段）
 > - 新增 **关于 / 联系方式** 页（QQ 群、Telegram、GitHub）
@@ -68,14 +66,28 @@
 
 | 版本 | 动画数量 | 包大小 | 状态 |
 |---|---|---|---|
-| **v1.1** | **106 段** | 约 54 MB | 🚧 待发布（预计 2026-11-01） |
+| **v1.1** | **106 段** | 55.2 MB | ✅ 已发布（2026-11-01） |
 | **v1.0** | **12 段** | 11.1 MB | ✅ 已发布 |
 
-### v1.0（12 段动画）
+### v1.1（106 段动画）
 
 | 项 | 值 |
 |---|---|
-| 安装包 | [`lanjing-overlay-v1.0-legacy.apk`](https://github.com/h121003/lanjing-overlay/releases/download/v1.0-legacy/lanjing-overlay-v1.0-legacy.apk) |
+| 安装包 | [`lanjing-overlay-v1.1.apk`](https://github.com/h121003/lanjing-overlay/releases/download/v1.1/lanjing-overlay-v1.1.apk) |
+| 大小 | 55,207,697 字节 |
+| SHA-256 | `16139e0e1ebc842e478570cf71f39db5de81ad3c4e41dab428891ddad822fd32` |
+| 版本 | 1.1（versionCode 5） |
+| 动画 | 106 段 |
+| 新增 | 关于 / 联系方式页（QQ 群、Telegram、微信赞赏码、GitHub） |
+| 修复 | WebView 上下文、销毁泄漏、权限撤销崩溃、横竖屏适配、切换卡顿、点击丢失 |
+
+> 从 v1.0 升级需要先卸载（签名不同）。
+
+### v1.0（12 段动画，历史版本）
+
+| 项 | 值 |
+|---|---|
+| 安装包 | [`lanjing-overlay-v1.0-legacy.apk`](https://github.com/h121003/lanjing-overlay/releases/download/v1.0/lanjing-overlay-v1.0-legacy.apk) |
 | 大小 | 11,688,146 字节（11.1 MiB） |
 | 包名 | `com.deepseek.petoverlay` |
 | 版本 | 1.0 |
@@ -149,7 +161,7 @@ docs/
 
 ## 已知问题
 
-**v1.0-legacy 存在资源重复打包**：同一批动画在包里存了两份 ——
+**v1.0 存在资源重复打包**：同一批动画在包里存了两份 ——
 
 ```text
 assets/webm/anim1.webm          ← 实际使用的
@@ -164,7 +176,8 @@ assets/assets/webm/anim1.webm   ← 多余的副本
 
 | 版本 | 日期 | 说明 |
 |---|---|---|
-| v1.0-legacy | 2026-10-21 | 首个公开留存的构建，存在 assets 重复打包问题 |
+| v1.1 | 2026-11-01 | 106 段动画 + 关于/联系方式页 + 六项稳定性修复 |
+| v1.0 | 2026-10-21 | 12 段动画，首个公开留存构建，存在 assets 重复打包问题 |
 
 完整记录见 **[docs/CHANGELOG.md](docs/CHANGELOG.md)**。
 
