@@ -1,11 +1,13 @@
 # 蓝鲸悬浮窗 · Lanjing Overlay
 
 > 一块常驻桌面的 WebView 悬浮窗，循环播放 WebM 透明动画，可拖动、可缩放。
+>
+> 内置 **106 段动画**，含「关于 / 联系方式」页；**v1.3 正在开发液态玻璃底部导航栏**。
 
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Android%207.0%2B-3ddc84.svg)](#安装)
 [![Version](https://img.shields.io/badge/version-1.1-orange.svg)](docs/CHANGELOG.md)
-[![Next](https://img.shields.io/badge/released-1.1%20%C2%B7%202026--11--01-brightgreen.svg)](docs/ROADMAP.md)
+[![Next](https://img.shields.io/badge/next-v1.3%20%C2%B7%20dev-blueviolet.svg)](docs/ROADMAP.md)
 [![Package](https://img.shields.io/badge/package-com.deepseek.petoverlay-6f42c1.svg)](#安装)
 
 ---
