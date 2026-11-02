@@ -24,13 +24,33 @@
 > 动画素材的授权尚在与素材作者沟通中（见
 > [素材来源](../README.md#素材来源)），因此仓库不分发素材，仅在安装包内使用。
 
-## v1.2 — 规划中
+## v1.2 — 已完成，待发布（2026-11-10）
 
-- [ ] 继续优化稳定性与机型兼容性
-- [ ] 改善缩放与拖拽的手感
-- [ ] 支持自定义动画导入
+安全加固版本。不改动 UI 与交互。
 
-具体排期以 [Releases](https://github.com/h121003/lanjing-overlay/releases) 为准。
+- [x] `targetSdk` 28 → 33
+- [x] `allowBackup=false`，关闭 adb backup 通道
+- [x] WebView 收紧：关闭 `contentAccess`、DOM Storage、跨源文件访问
+- [x] 防 tapjacking：悬浮窗增加触摸遮挡检测
+- [x] 声明 `foregroundServiceType=specialUse`（Android 14+ 必需）
+- [x] 关闭调试日志输出
+
+> 独立构建：`release/1.2` 分支，versionName 1.2 / versionCode 6
+
+## v1.3 — 进行中
+
+液态玻璃底部导航栏。
+
+- [ ] 圆形玻璃气泡 + 真实折射
+- [ ] 拖动时椭圆拉伸、松手回弹淡出
+- [ ] 边缘彩色色散
+- [ ] 主题：浅色 / 深色 / 跟随系统
+- [ ] 自定义壁纸
+
+## v1.4 — 规划中
+
+- [ ] 稳定性与机型兼容
+- [ ] 自定义动画导入
 
 ---
 
