@@ -1,5 +1,35 @@
 # 版本记录
 
+## v1.3 — 开发中
+
+液态玻璃底部导航栏（不改动悬浮窗逻辑）。
+
+- 底部导航改为 4 个 Tab：宠物 / 外观 / 设置 / 关于
+- 圆形玻璃气泡：AGSL `RuntimeShader` 采样自身快照，平面折射 + 边缘色散
+- 拖动时椭圆拉伸（速度驱动），松手回弹并淡出
+- 整条栏随气泡轻微横移
+- 主题：浅色 / 深色 / 跟随系统；支持自定义壁纸
+- 降级策略：Android 12 及以下无 AGSL，自动回退为放大重绘
+
+## v1.2 — 2026-11-10
+
+安全加固版本。不改动 UI 与交互。
+
+- `targetSdk` 28 → 33
+- `allowBackup=false`，关闭 adb backup 通道
+- WebView 收紧：关闭 `contentAccess`、DOM Storage、跨源文件访问
+- 防 tapjacking：悬浮窗增加触摸遮挡检测
+- 声明 `foregroundServiceType=specialUse`（Android 14+ 必需）
+- 关闭调试日志输出
+
+| 项 | 值 |
+|---|---|
+| versionName | 1.2 |
+| versionCode | 6 |
+| 动画 | 106 段 |
+| 大小 | 55,208,371 字节 |
+| SHA-256 | `8f7405492a29b68e9de073283d1ea8b503df20931d71ae711716b49c06be8c35` |
+
 ## v1.1 — 2026-11-01
 
 动画扩充 + 联系方式页 + 稳定性修复。
