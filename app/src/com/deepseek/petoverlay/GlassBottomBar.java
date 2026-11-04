@@ -42,6 +42,7 @@ public class GlassBottomBar extends View {
     private static final String GLASS_AGSL =
             "uniform shader content;\n" +
             "uniform float2 size;\n" +
+            "uniform float2 center;\n" +
             "uniform float4 cornerRadii;\n" +
             "uniform float refractionHeight;\n" +
             "uniform float refractionAmount;\n" +
@@ -68,8 +69,8 @@ public class GlassBottomBar extends View {
             "float circleMap(float x) { return 1.0 - sqrt(max(0.0, 1.0 - x * x)); }\n" +
             "half4 main(float2 coord) {\n" +
             "  float2 halfSize = size * 0.5;\n" +
-            "  float2 p = coord - halfSize;\n" +
-            "  float radius = radiusAt(coord, cornerRadii);\n" +
+            "  float2 p = coord - center;\n" +
+            "  float radius = radiusAt(p, cornerRadii);\n" +
             "  float sd = sdRoundedRect(p, halfSize, radius);\n" +
             "  if (-sd >= refractionHeight) return content.eval(coord);\n" +
             "  sd = min(sd, 0.0);\n" +
@@ -469,6 +470,8 @@ public class GlassBottomBar extends View {
             rsCls.getMethod("setFloatUniform", String.class, float[].class)
                     .invoke(rs, "size", new float[]{w, h});
             rsCls.getMethod("setFloatUniform", String.class, float[].class)
+                    .invoke(rs, "center", new float[]{barRect.centerX(), barRect.centerY()});
+            rsCls.getMethod("setFloatUniform", String.class, float[].class)
                     .invoke(rs, "cornerRadii", new float[]{r, r, r, r});
             rsCls.getMethod("setFloatUniform", String.class, float.class)
                     .invoke(rs, "refractionHeight", dp(20f));
@@ -479,9 +482,8 @@ public class GlassBottomBar extends View {
 
             c.save();
             c.clipPath(barPath);
-            c.translate(barRect.left, barRect.top);
             paint.setShader((Shader) rs);
-            c.drawRect(0, 0, w, h, paint);
+            c.drawRect(barRect, paint);
             paint.setShader(null);
             c.restore();
         } catch (Throwable t) {
