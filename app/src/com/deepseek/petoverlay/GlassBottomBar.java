@@ -35,6 +35,69 @@ public class GlassBottomBar extends View {
     private static final float MAGNIFY = 1.30f;
 
     /** 折射 + 色散：中心放大，边缘把 RGB 三个通道往不同方向偏 */
+    /**
+     * 移植自 Kyant0/AndroidLiquidGlass（Apache-2.0）的圆角矩形 SDF 折射着色器。
+     * 见 https://github.com/Kyant0/AndroidLiquidGlass/blob/kmp/backdrop/src/commonMain/kotlin/com/kyant/backdrop/internal/Shaders.kt
+     */
+    private static final String GLASS_AGSL =
+            "uniform shader content;\n" +
+            "uniform float2 size;\n" +
+            "uniform float4 cornerRadii;\n" +
+            "uniform float refractionHeight;\n" +
+            "uniform float refractionAmount;\n" +
+            "uniform float chromaticAberration;\n" +
+            "float radiusAt(float2 coord, float4 radii) {\n" +
+            "  if (coord.x >= 0.0) { if (coord.y <= 0.0) return radii.y; else return radii.z; }\n" +
+            "  else { if (coord.y <= 0.0) return radii.x; else return radii.w; }\n" +
+            "}\n" +
+            "float sdRoundedRect(float2 coord, float2 halfSize, float radius) {\n" +
+            "  float2 cornerCoord = abs(coord) - (halfSize - float2(radius));\n" +
+            "  float outside = length(max(cornerCoord, float2(0.0))) - radius;\n" +
+            "  float inside = min(max(cornerCoord.x, cornerCoord.y), 0.0);\n" +
+            "  return outside + inside;\n" +
+            "}\n" +
+            "float2 gradSdRoundedRect(float2 coord, float2 halfSize, float radius) {\n" +
+            "  float2 cornerCoord = abs(coord) - (halfSize - float2(radius));\n" +
+            "  if (cornerCoord.x >= 0.0 || cornerCoord.y >= 0.0) {\n" +
+            "    float2 v = max(cornerCoord, float2(0.0));\n" +
+            "    return sign(coord) * normalize(v + float2(1e-5));\n" +
+            "  }\n" +
+            "  float gx = step(cornerCoord.y, cornerCoord.x);\n" +
+            "  return sign(coord) * float2(gx, 1.0 - gx);\n" +
+            "}\n" +
+            "float circleMap(float x) { return 1.0 - sqrt(max(0.0, 1.0 - x * x)); }\n" +
+            "half4 main(float2 coord) {\n" +
+            "  float2 halfSize = size * 0.5;\n" +
+            "  float2 p = coord - halfSize;\n" +
+            "  float radius = radiusAt(coord, cornerRadii);\n" +
+            "  float sd = sdRoundedRect(p, halfSize, radius);\n" +
+            "  if (-sd >= refractionHeight) return content.eval(coord);\n" +
+            "  sd = min(sd, 0.0);\n" +
+            "  float d = circleMap(1.0 - (-sd) / refractionHeight) * refractionAmount;\n" +
+            "  float gr = min(radius * 1.5, min(halfSize.x, halfSize.y));\n" +
+            "  float2 grad = gradSdRoundedRect(p, halfSize, gr);\n" +
+            "  float2 rc = coord + d * grad;\n" +
+            "  if (chromaticAberration <= 0.0) return content.eval(rc);\n" +
+            "  float disp = chromaticAberration * ((p.x * p.y) / max(1.0, halfSize.x * halfSize.y));\n" +
+            "  float2 dc = d * grad * disp;\n" +
+            "  half4 color = half4(0.0);\n" +
+            "  half4 red = content.eval(rc + dc);\n" +
+            "  color.r += red.r / 3.5; color.a += red.a / 7.0;\n" +
+            "  half4 orange = content.eval(rc + dc * (2.0 / 3.0));\n" +
+            "  color.r += orange.r / 3.5; color.g += orange.g / 7.0; color.a += orange.a / 7.0;\n" +
+            "  half4 yellow = content.eval(rc + dc * (1.0 / 3.0));\n" +
+            "  color.r += yellow.r / 3.5; color.g += yellow.g / 3.5; color.a += yellow.a / 7.0;\n" +
+            "  half4 green = content.eval(rc);\n" +
+            "  color.g += green.g / 3.5; color.a += green.a / 7.0;\n" +
+            "  half4 cyan = content.eval(rc - dc * (1.0 / 3.0));\n" +
+            "  color.g += cyan.g / 3.5; color.b += cyan.b / 3.0; color.a += cyan.a / 7.0;\n" +
+            "  half4 blue = content.eval(rc - dc * (2.0 / 3.0));\n" +
+            "  color.b += blue.b / 3.0; color.a += blue.a / 7.0;\n" +
+            "  half4 purple = content.eval(rc - dc);\n" +
+            "  color.r += purple.r / 7.0; color.b += purple.b / 3.0; color.a += purple.a / 7.0;\n" +
+            "  return color;\n" +
+            "}\n";
+
     private static final String AGSL =
             "uniform shader content;\n" +
             "uniform float2 center;\n" +
@@ -69,6 +132,7 @@ public class GlassBottomBar extends View {
     private final RectF bubbleRect = new RectF();
     private final Path iconPath = new Path();
     private final Path bubblePath = new Path();
+    private final Path barPath = new Path();
     private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint iconPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint labelPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -89,6 +153,10 @@ public class GlassBottomBar extends View {
     private android.graphics.Bitmap snapshot;   // 任务栏快照（折射采样源）
     private Object runtimeShader;               // 复用 RuntimeShader（API 33+）
     private android.graphics.BitmapShader shaderInput;
+    private Object glassShader;
+    private android.graphics.BitmapShader glassInput;
+    private android.graphics.Bitmap glassBoundTo;
+    private boolean glassBroken;
     private android.graphics.Bitmap shaderBoundTo;
     private boolean shaderBroken = false;
     private OnTabSelected listener;
@@ -137,6 +205,7 @@ public class GlassBottomBar extends View {
         barRect.set(dp(MARGIN_X_DP), h - dp(MARGIN_BOTTOM_DP) - barH,
                 w - dp(MARGIN_X_DP), h - dp(MARGIN_BOTTOM_DP));
         if (lensCenterX < 0) lensCenterX = centerOf(selected);
+            post(new Runnable() { @Override public void run() { captureSnapshot(); } });
     }
 
     // ---------------- 绘制 ----------------
@@ -155,6 +224,7 @@ public class GlassBottomBar extends View {
         c.translate(shift, 0f);
         drawBar(c, r);
         drawItems(c);
+        drawGlassRim(c);
         if (bubbleAlpha > 0.01f) drawBubble(c);
         c.restore();
     }
@@ -170,6 +240,8 @@ public class GlassBottomBar extends View {
     }
 
     private void drawBar(Canvas c, float r) {
+        barPath.reset();
+        barPath.addRoundRect(barRect, r, r, Path.Direction.CW);
         paint.setShader(null);
         paint.setStyle(Paint.Style.FILL);
         paint.setColor(dark ? 0xEE151A20 : 0xEEF2F5F9);
@@ -371,6 +443,51 @@ public class GlassBottomBar extends View {
         drawBar(c, barRect.height() / 2f);
         drawItems(c);
         c.restore();
+    }
+
+    /** 用 Kyant 的 SDF 折射着色器给栏体边缘做液态玻璃 */
+    private void drawGlassRim(Canvas c) {
+        if (android.os.Build.VERSION.SDK_INT < 33 || glassBroken) return;
+        if (snapshot == null || snapshot.isRecycled()) return;
+        try {
+            Object rs = glassShader;
+            Class<?> rsCls = Class.forName("android.graphics.RuntimeShader");
+            Class<?> shaderCls = Class.forName("android.graphics.Shader");
+            if (rs == null) {
+                rs = rsCls.getConstructor(String.class).newInstance(GLASS_AGSL);
+                glassShader = rs;
+            }
+            if (glassBoundTo != snapshot) {
+                glassInput = new android.graphics.BitmapShader(
+                        snapshot, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP);
+                rsCls.getMethod("setInputShader", String.class, shaderCls)
+                        .invoke(rs, "content", glassInput);
+                glassBoundTo = snapshot;
+            }
+            float w = barRect.width(), h = barRect.height();
+            float r = h / 2f;
+            rsCls.getMethod("setFloatUniform", String.class, float[].class)
+                    .invoke(rs, "size", new float[]{w, h});
+            rsCls.getMethod("setFloatUniform", String.class, float[].class)
+                    .invoke(rs, "cornerRadii", new float[]{r, r, r, r});
+            rsCls.getMethod("setFloatUniform", String.class, float.class)
+                    .invoke(rs, "refractionHeight", dp(20f));
+            rsCls.getMethod("setFloatUniform", String.class, float.class)
+                    .invoke(rs, "refractionAmount", -dp(12f));
+            rsCls.getMethod("setFloatUniform", String.class, float.class)
+                    .invoke(rs, "chromaticAberration", 0.6f);
+
+            c.save();
+            c.clipPath(barPath);
+            c.translate(barRect.left, barRect.top);
+            paint.setShader((Shader) rs);
+            c.drawRect(0, 0, w, h, paint);
+            paint.setShader(null);
+            c.restore();
+        } catch (Throwable t) {
+            glassBroken = true;
+            paint.setShader(null);
+        }
     }
 
     private void drawItems(Canvas c) {
