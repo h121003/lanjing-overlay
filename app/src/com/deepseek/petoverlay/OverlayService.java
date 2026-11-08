@@ -117,7 +117,7 @@ public class OverlayService extends Service {
         s.setMediaPlaybackRequiresUserGesture(false);
         s.setAllowFileAccess(true);                 // 必需：加载 android_asset
         s.setAllowContentAccess(false);
-        s.setAllowFileAccessFromFileURLs(false);
+        s.setAllowFileAccessFromFileURLs(true);   // 本地 assets 页面需要读取 webm 资源
         s.setAllowUniversalAccessFromFileURLs(false);
         s.setDomStorageEnabled(false);
         s.setSaveFormData(false);
